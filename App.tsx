@@ -9,7 +9,7 @@ import { LeadBrokerSection } from './components/LeadBrokerSection';
 import { DealBrokerSection } from './components/DealBrokerSection';
 import { UserProfile, Deal, FunnelStats, MonthData, DealStatus, DealType, FunnelType } from './types';
 import { useSupabaseData } from './hooks/useSupabaseData';
-import { LayoutGrid, Users, LogOut, ChevronDown, ChevronRight, BarChart3, Coins, CalendarDays, Loader2, AlertCircle } from 'lucide-react';
+import { LayoutGrid, Users, LogOut, ChevronDown, ChevronRight, BarChart3, Coins, CalendarDays, Loader2, AlertCircle, WifiOff } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const App: React.FC = () => {
@@ -21,8 +21,8 @@ const App: React.FC = () => {
 
   // Supabase Data Hook
   const { 
-    months, deals: allDeals, funnelStats: allFunnelStats, loading, 
-    updateMonth, updateDeal, addDeal, updateFunnel, createFunnelStats 
+    months, deals: allDeals, funnelStats: allFunnelStats, loading, error,
+    updateMonth, updateDeal, addDeal, updateFunnel, createFunnelStats, refresh
   } = useSupabaseData(user?.email);
 
   // Set default month once data loads
@@ -50,7 +50,6 @@ const App: React.FC = () => {
   };
 
   // --- Handlers ---
-
   const handleUpdateDeal = (id: string, field: keyof Deal, value: any) => {
     updateDeal(id, field, value);
   };
@@ -80,30 +79,23 @@ const App: React.FC = () => {
   };
 
   const handleUpdateFunnel = async (id: string, field: keyof FunnelStats, value: number) => {
-    // If it's a temp ID, it means the record doesn't exist in DB yet.
     if (id.startsWith('temp_')) {
         const type = id.replace('temp_', '') as FunnelType;
-        const newStat = await createFunnelStats({
+        await createFunnelStats({
             month_id: selectedMonthId,
             funnel_type: type,
             [field]: value
         });
-        // The UI will update automatically via the hook's refresh or state update
     } else {
         updateFunnel(id, field, value);
     }
   };
 
-  // Helper to ensure funnel stats exist for UI even if DB is empty
   const getFunnelStatsForRender = () => {
-      // Define all required types
       const types = [FunnelType.OUTBOUND, FunnelType.LEAD_BROKER, FunnelType.INDICATION];
-      
       return types.map(type => {
           const existing = allFunnelStats.find(f => f.month_id === selectedMonthId && f.funnel_type === type);
           if (existing) return existing;
-          
-          // Return placeholder structure that triggers CREATE on first edit
           return {
             id: `temp_${type}`,
             month_id: selectedMonthId,
@@ -124,23 +116,52 @@ const App: React.FC = () => {
           <div className="min-h-screen flex items-center justify-center bg-gray-50">
               <div className="flex flex-col items-center gap-4">
                   <Loader2 className="w-8 h-8 text-v4-red animate-spin" />
-                  <p className="text-gray-500 font-medium">Carregando dados...</p>
+                  <p className="text-gray-500 font-medium">Sincronizando dados...</p>
               </div>
           </div>
       );
   }
 
-  // --- ERROR/EMPTY STATE ---
-  // If we finished loading but have no month data (should be rare with fallback)
+  // --- CRITICAL ERROR STATE (Sync Failed) ---
+  if (error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <div className="bg-white max-w-lg w-full rounded-xl shadow-2xl p-8 text-center border-t-4 border-red-600">
+             <div className="flex justify-center mb-6">
+               <div className="bg-red-100 p-4 rounded-full">
+                 <WifiOff className="w-10 h-10 text-red-600" />
+               </div>
+             </div>
+             <h2 className="text-2xl font-bold text-gray-800 mb-2">Falha na Sincronização</h2>
+             <p className="text-gray-600 mb-6">
+               Não foi possível conectar ao banco de dados global. 
+               <br/><br/>
+               <span className="text-sm bg-gray-100 p-2 rounded text-gray-700 font-mono">{error}</span>
+             </p>
+             <div className="bg-blue-50 p-4 rounded-lg text-left text-sm text-blue-800 mb-6">
+                <strong>Atenção Admin:</strong> Como o login foi removido, você deve configurar as permissões do Supabase (RLS) para permitir acesso "Anônimo/Público" às tabelas, caso contrário os dados não serão salvos.
+             </div>
+             <button 
+               onClick={() => refresh()}
+               className="bg-v4-red text-white px-8 py-3 rounded-lg font-bold hover:bg-red-700 transition-colors w-full"
+             >
+               Tentar Novamente
+             </button>
+          </div>
+        </div>
+      );
+  }
+
+  // --- EMPTY STATE (Should catch if seed failed but didn't throw) ---
   if (!selectedMonth) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-gray-50">
              <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md">
                 <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Nenhum dado encontrado</h2>
-                <p className="text-gray-600 mb-6">Não foi possível carregar os dados mensais. Verifique a conexão com o banco de dados.</p>
+                <p className="text-gray-600 mb-6">A conexão foi feita, mas não há meses cadastrados.</p>
                 <button 
-                  onClick={() => window.location.reload()}
+                  onClick={() => refresh()}
                   className="bg-v4-red text-white px-6 py-2 rounded-lg font-bold"
                 >
                   Recarregar
@@ -164,7 +185,7 @@ const App: React.FC = () => {
                   <span className="font-bold text-lg tracking-tight text-gray-900 hidden md:block">Prates Hanzava</span>
                 </div>
                 
-                {/* Month Selector (Only show if not in Annual view) */}
+                {/* Month Selector */}
                 {currentTab !== 'annual' && (
                   <div className="ml-8 relative">
                     <button 
@@ -176,7 +197,6 @@ const App: React.FC = () => {
                       <ChevronDown className="w-4 h-4 text-gray-400" />
                     </button>
 
-                    {/* Nested Dropdown */}
                     {isMonthSelectorOpen && (
                       <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50 animate-fade-in-down">
                         {years.map(year => (
@@ -188,8 +208,6 @@ const App: React.FC = () => {
                               {year}
                               {expandedYear === year ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3 text-gray-400" />}
                             </button>
-                            
-                            {/* Months List */}
                             {expandedYear === year && (
                               <div className="bg-gray-50 py-1">
                                 {months.filter(m => m.year === year).map(m => (
@@ -210,13 +228,8 @@ const App: React.FC = () => {
                         ))}
                       </div>
                     )}
-                    
-                    {/* Backdrop to close */}
-                    {isMonthSelectorOpen && (
-                      <div 
-                        className="fixed inset-0 z-40 bg-transparent" 
-                        onClick={() => setIsMonthSelectorOpen(false)}
-                      ></div>
+                     {isMonthSelectorOpen && (
+                      <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setIsMonthSelectorOpen(false)}></div>
                     )}
                   </div>
                 )}

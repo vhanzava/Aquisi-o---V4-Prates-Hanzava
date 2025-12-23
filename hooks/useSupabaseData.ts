@@ -1,29 +1,28 @@
 
 import { useState, useEffect } from 'react';
 import { supabase, IS_DEMO_MODE } from '../supabaseClient';
-import { MonthData, Deal, FunnelStats, DealStatus } from '../types';
-import { MOCK_MONTHS, MOCK_DEALS, MOCK_FUNNEL } from '../mockData';
+import { MonthData, Deal, FunnelStats } from '../types';
+import { MOCK_MONTHS } from '../mockData';
 
 export const useSupabaseData = (userEmail?: string) => {
   const [months, setMonths] = useState<MonthData[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [funnelStats, setFunnelStats] = useState<FunnelStats[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const loadMockData = () => {
-    console.log("Using Offline/Mock Data fallback");
-    setMonths(MOCK_MONTHS);
-    setDeals(MOCK_DEALS);
-    setFunnelStats(MOCK_FUNNEL);
-    setLoading(false);
-  };
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     
     // --- DEMO MODE CHECK ---
     if (IS_DEMO_MODE) {
-      setTimeout(loadMockData, 600);
+      // Only use Mocks explicitly in Demo Mode
+      const { MOCK_DEALS, MOCK_FUNNEL } = await import('../mockData');
+      setMonths(MOCK_MONTHS);
+      setDeals(MOCK_DEALS);
+      setFunnelStats(MOCK_FUNNEL);
+      setLoading(false);
       return;
     }
 
@@ -35,48 +34,44 @@ export const useSupabaseData = (userEmail?: string) => {
         .select('*')
         .order('id', { ascending: true });
 
-      // Handle table not found or connection error by falling back
       if (monthsError) {
-        console.warn("Supabase Fetch Error (using fallback):", monthsError.message);
-        loadMockData();
-        return;
+        throw monthsError;
       }
 
-      // If DB is connected but empty, try to seed
+      // If DB is empty, Attempt to seed Initial Structure (Months)
+      // This ensures all admins see the same structure
       if (!monthsData || monthsData.length === 0) {
-         console.log("Database empty. Attempting to seed...");
-         const { data, error } = await supabase.from('months').insert(MOCK_MONTHS).select();
+         console.log("Database empty. Seeding initial months structure...");
+         const { data, error: seedError } = await supabase.from('months').insert(MOCK_MONTHS).select();
          
-         // If seeding fails (likely due to RLS/Permission denied for Anon users), load mocks locally
-         if (error) {
-             console.warn("Seeding failed (RLS blocking Anon write). Loading local data only.", error);
-             loadMockData();
-             return;
-         } else {
-             monthsData = data;
+         if (seedError) {
+             console.error("Seeding Failed:", seedError);
+             throw new Error("Banco de dados vazio e falha ao inicializar. Verifique as permissões RLS no Supabase.");
          }
+         monthsData = data;
       }
       
-      if (monthsData && monthsData.length > 0) {
+      if (monthsData) {
         setMonths(monthsData);
 
         // 2. Fetch Deals
-        const { data: dealsData } = await supabase.from('deals').select('*');
+        const { data: dealsData, error: dealsError } = await supabase.from('deals').select('*');
+        if (dealsError) throw dealsError;
         if (dealsData) setDeals(dealsData);
 
         // 3. Fetch Funnel
-        const { data: funnelData } = await supabase.from('funnel_stats').select('*');
+        const { data: funnelData, error: funnelError } = await supabase.from('funnel_stats').select('*');
+        if (funnelError) throw funnelError;
         if (funnelData) setFunnelStats(funnelData);
-        
-        setLoading(false);
-      } else {
-        // Fallback if data is still somehow empty
-        loadMockData();
       }
 
-    } catch (error) {
-      console.error('Critical Error fetching data:', error);
-      loadMockData();
+    } catch (err: any) {
+      console.error('Critical Error fetching data:', err);
+      setError(err.message || "Erro desconhecido ao conectar com o banco.");
+      // DO NOT FALLBACK TO MOCK DATA HERE. 
+      // Falling back creates "split brain" where users think they are working but aren't syncing.
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,19 +82,36 @@ export const useSupabaseData = (userEmail?: string) => {
   }, [userEmail]);
 
   // --- CRUD OPERATIONS ---
+  // We added error alerting to ensure users know if a save fails
 
   const updateMonth = async (id: string, field: keyof MonthData, value: any) => {
+    // Optimistic Update
     setMonths(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
-    if (!IS_DEMO_MODE) await supabase.from('months').update({ [field]: value }).eq('id', id);
+    
+    if (!IS_DEMO_MODE) {
+      const { error } = await supabase.from('months').update({ [field]: value }).eq('id', id);
+      if (error) {
+        console.error("Failed to save Month update:", error);
+        alert("Erro ao salvar alteração. Verifique sua conexão.");
+        fetchData(); // Revert/Refresh
+      }
+    }
   };
 
   const updateDeal = async (id: string, field: keyof Deal, value: any) => {
     setDeals(prev => prev.map(d => d.id === id ? { ...d, [field]: value } : d));
-    if (!IS_DEMO_MODE) await supabase.from('deals').update({ [field]: value }).eq('id', id);
+    
+    if (!IS_DEMO_MODE) {
+      const { error } = await supabase.from('deals').update({ [field]: value }).eq('id', id);
+      if (error) {
+        console.error("Failed to save Deal update:", error);
+        alert("Erro ao salvar contrato. Tente novamente.");
+        fetchData();
+      }
+    }
   };
 
   const addDeal = async (deal: Partial<Deal>) => {
-     // Local Optimistic Update first
      const tempId = `temp_${Date.now()}`;
      const newDealOptimistic = { ...deal, id: tempId } as Deal;
      setDeals(prev => [...prev, newDealOptimistic]);
@@ -110,8 +122,9 @@ export const useSupabaseData = (userEmail?: string) => {
        
        if (error) {
            console.error('Error persisting deal:', error);
+           alert("Erro ao criar novo contrato.");
+           setDeals(prev => prev.filter(d => d.id !== tempId)); // Remove optimistic
        } else if (data) {
-           // Replace temp ID with real ID
            setDeals(prev => prev.map(d => d.id === tempId ? data[0] : d));
        }
      }
@@ -119,15 +132,20 @@ export const useSupabaseData = (userEmail?: string) => {
 
   const updateFunnel = async (id: string, field: keyof FunnelStats, value: any) => {
     setFunnelStats(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
+    
     if (!IS_DEMO_MODE && !id.startsWith('temp_')) {
-        await supabase.from('funnel_stats').update({ [field]: value }).eq('id', id);
+        const { error } = await supabase.from('funnel_stats').update({ [field]: value }).eq('id', id);
+        if (error) {
+           console.error("Failed to save Funnel update:", error);
+           alert("Erro ao salvar dados do funil.");
+        }
     }
   };
 
   const createFunnelStats = async (stats: Partial<FunnelStats>) => {
       const tempId = `temp_${stats.funnel_type}`;
       const newStat = { ...stats, id: tempId } as FunnelStats;
-      setFunnelStats(prev => [...prev, newStat]); // Optimistic
+      setFunnelStats(prev => [...prev, newStat]);
 
       if (!IS_DEMO_MODE) {
         const { id, ...cleanStats } = stats as any;
@@ -136,7 +154,10 @@ export const useSupabaseData = (userEmail?: string) => {
            setFunnelStats(prev => prev.map(f => f.id === tempId ? data[0] : f));
            return data[0];
         }
-        if (error) console.error("Error creating funnel stat", error);
+        if (error) {
+            console.error("Error creating funnel stat", error);
+            alert("Erro ao inicializar dados do funil.");
+        }
       }
       return newStat;
   };
@@ -146,6 +167,7 @@ export const useSupabaseData = (userEmail?: string) => {
     deals,
     funnelStats,
     loading,
+    error,
     updateMonth,
     updateDeal,
     addDeal,
