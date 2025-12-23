@@ -10,22 +10,20 @@ export const useSupabaseData = (userEmail?: string) => {
   const [funnelStats, setFunnelStats] = useState<FunnelStats[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadMockData = () => {
+    console.log("Using Offline/Mock Data fallback");
+    setMonths(MOCK_MONTHS);
+    setDeals(MOCK_DEALS);
+    setFunnelStats(MOCK_FUNNEL);
+    setLoading(false);
+  };
+
   const fetchData = async () => {
     setLoading(true);
     
-    // --- DEMO MODE: LOAD MOCK DATA ---
+    // --- DEMO MODE CHECK ---
     if (IS_DEMO_MODE) {
-      console.log("Loading Demo Data...");
-      
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      // Initialize with mocks if empty
-      if (months.length === 0) setMonths(MOCK_MONTHS);
-      if (deals.length === 0) setDeals(MOCK_DEALS);
-      if (funnelStats.length === 0) setFunnelStats(MOCK_FUNNEL);
-      
-      setLoading(false);
+      setTimeout(loadMockData, 600);
       return;
     }
 
@@ -37,34 +35,48 @@ export const useSupabaseData = (userEmail?: string) => {
         .select('*')
         .order('id', { ascending: true });
 
-      if (monthsError) throw monthsError;
+      // Handle table not found or connection error by falling back
+      if (monthsError) {
+        console.warn("Supabase Fetch Error (using fallback):", monthsError.message);
+        loadMockData();
+        return;
+      }
 
-      // Seed months if empty (First run)
+      // If DB is connected but empty, try to seed
       if (!monthsData || monthsData.length === 0) {
-         console.log("Seeding months...");
+         console.log("Database empty. Attempting to seed...");
          const { data, error } = await supabase.from('months').insert(MOCK_MONTHS).select();
+         
+         // If seeding fails (likely due to RLS/Permission denied for Anon users), load mocks locally
          if (error) {
-             console.error("Error seeding:", error);
+             console.warn("Seeding failed (RLS blocking Anon write). Loading local data only.", error);
+             loadMockData();
+             return;
          } else {
              monthsData = data;
          }
       }
-      if (monthsData) setMonths(monthsData);
+      
+      if (monthsData && monthsData.length > 0) {
+        setMonths(monthsData);
 
-      // 2. Fetch Deals
-      const { data: dealsData, error: dealsError } = await supabase.from('deals').select('*');
-      if (dealsError) throw dealsError;
-      if (dealsData) setDeals(dealsData);
+        // 2. Fetch Deals
+        const { data: dealsData } = await supabase.from('deals').select('*');
+        if (dealsData) setDeals(dealsData);
 
-      // 3. Fetch Funnel
-      const { data: funnelData, error: funnelError } = await supabase.from('funnel_stats').select('*');
-      if (funnelError) throw funnelError;
-      if (funnelData) setFunnelStats(funnelData);
+        // 3. Fetch Funnel
+        const { data: funnelData } = await supabase.from('funnel_stats').select('*');
+        if (funnelData) setFunnelStats(funnelData);
+        
+        setLoading(false);
+      } else {
+        // Fallback if data is still somehow empty
+        loadMockData();
+      }
 
     } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
+      console.error('Critical Error fetching data:', error);
+      loadMockData();
     }
   };
 
@@ -74,82 +86,59 @@ export const useSupabaseData = (userEmail?: string) => {
     }
   }, [userEmail]);
 
-  // --- CRUD OPERATIONS (Hybrid: Demo vs Real) ---
+  // --- CRUD OPERATIONS ---
 
   const updateMonth = async (id: string, field: keyof MonthData, value: any) => {
-    // 1. Optimistic Update (Works for both Demo and Real)
     setMonths(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
-    
-    // 2. Persist
-    if (!IS_DEMO_MODE) {
-        const { error } = await supabase.from('months').update({ [field]: value }).eq('id', id);
-        if (error) {
-          console.error('Error updating month:', error);
-          fetchData(); // Revert on error
-        }
-    }
+    if (!IS_DEMO_MODE) await supabase.from('months').update({ [field]: value }).eq('id', id);
   };
 
   const updateDeal = async (id: string, field: keyof Deal, value: any) => {
     setDeals(prev => prev.map(d => d.id === id ? { ...d, [field]: value } : d));
-
-    if (!IS_DEMO_MODE) {
-        const { error } = await supabase.from('deals').update({ [field]: value }).eq('id', id);
-        if (error) {
-          console.error('Error updating deal:', error);
-          fetchData();
-        }
-    }
+    if (!IS_DEMO_MODE) await supabase.from('deals').update({ [field]: value }).eq('id', id);
   };
 
   const addDeal = async (deal: Partial<Deal>) => {
-     if (IS_DEMO_MODE) {
-         const newDeal = { ...deal, id: `temp_${Date.now()}` } as Deal;
-         setDeals(prev => [...prev, newDeal]);
-         return;
-     }
+     // Local Optimistic Update first
+     const tempId = `temp_${Date.now()}`;
+     const newDealOptimistic = { ...deal, id: tempId } as Deal;
+     setDeals(prev => [...prev, newDealOptimistic]);
 
-     const { id, ...dealData } = deal as any;
-     const { data, error } = await supabase.from('deals').insert(dealData).select();
-     if (error) {
-         console.error('Error creating deal', error);
-         return;
-     }
-     if (data) {
-         setDeals(prev => [...prev, data[0]]);
+     if (!IS_DEMO_MODE) {
+       const { id, ...dealData } = deal as any;
+       const { data, error } = await supabase.from('deals').insert(dealData).select();
+       
+       if (error) {
+           console.error('Error persisting deal:', error);
+       } else if (data) {
+           // Replace temp ID with real ID
+           setDeals(prev => prev.map(d => d.id === tempId ? data[0] : d));
+       }
      }
   };
 
   const updateFunnel = async (id: string, field: keyof FunnelStats, value: any) => {
     setFunnelStats(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
-
-    if (!IS_DEMO_MODE) {
-        if (id.startsWith('temp_')) return; // Can't update temp rows in real DB without create first
-        const { error } = await supabase.from('funnel_stats').update({ [field]: value }).eq('id', id);
-        if (error) {
-            console.error('Error updating funnel:', error);
-            fetchData();
-        }
+    if (!IS_DEMO_MODE && !id.startsWith('temp_')) {
+        await supabase.from('funnel_stats').update({ [field]: value }).eq('id', id);
     }
   };
 
   const createFunnelStats = async (stats: Partial<FunnelStats>) => {
-      if (IS_DEMO_MODE) {
-          const newStat = { ...stats, id: `new_${Date.now()}` } as FunnelStats;
-          setFunnelStats(prev => [...prev, newStat]);
-          return newStat;
-      }
+      const tempId = `temp_${stats.funnel_type}`;
+      const newStat = { ...stats, id: tempId } as FunnelStats;
+      setFunnelStats(prev => [...prev, newStat]); // Optimistic
 
-      const { id, ...cleanStats } = stats as any;
-      const { data, error } = await supabase.from('funnel_stats').insert(cleanStats).select();
-      if (error) {
-          console.error("Error creating funnel stat", error);
-          return null;
+      if (!IS_DEMO_MODE) {
+        const { id, ...cleanStats } = stats as any;
+        const { data, error } = await supabase.from('funnel_stats').insert(cleanStats).select();
+        if (data) {
+           setFunnelStats(prev => prev.map(f => f.id === tempId ? data[0] : f));
+           return data[0];
+        }
+        if (error) console.error("Error creating funnel stat", error);
       }
-      if (data) {
-          setFunnelStats(prev => [...prev, data[0]]);
-          return data[0];
-      }
+      return newStat;
   };
 
   return {

@@ -9,7 +9,7 @@ import { LeadBrokerSection } from './components/LeadBrokerSection';
 import { DealBrokerSection } from './components/DealBrokerSection';
 import { UserProfile, Deal, FunnelStats, MonthData, DealStatus, DealType, FunnelType } from './types';
 import { useSupabaseData } from './hooks/useSupabaseData';
-import { LayoutGrid, Users, LogOut, ChevronDown, ChevronRight, BarChart3, Coins, CalendarDays, Loader2 } from 'lucide-react';
+import { LayoutGrid, Users, LogOut, ChevronDown, ChevronRight, BarChart3, Coins, CalendarDays, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const App: React.FC = () => {
@@ -27,12 +27,14 @@ const App: React.FC = () => {
 
   // Set default month once data loads
   useEffect(() => {
-    if (months.length > 0 && !selectedMonthId) {
-      // Try to find current month, else first
-      const today = new Date();
-      const currentId = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-      const found = months.find(m => m.id === currentId);
-      setSelectedMonthId(found ? found.id : months[0].id);
+    if (months.length > 0) {
+      if (!selectedMonthId) {
+        // Try to find current month, else first
+        const today = new Date();
+        const currentId = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        const found = months.find(m => m.id === currentId);
+        setSelectedMonthId(found ? found.id : months[0].id);
+      }
     }
   }, [months, selectedMonthId]);
 
@@ -116,13 +118,34 @@ const App: React.FC = () => {
       return <AuthGuard onLogin={setUser}>{null}</AuthGuard>;
   }
 
-  if (loading || !selectedMonth) {
+  // --- LOADING STATE ---
+  if (loading) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-gray-50">
               <div className="flex flex-col items-center gap-4">
                   <Loader2 className="w-8 h-8 text-v4-red animate-spin" />
                   <p className="text-gray-500 font-medium">Carregando dados...</p>
               </div>
+          </div>
+      );
+  }
+
+  // --- ERROR/EMPTY STATE ---
+  // If we finished loading but have no month data (should be rare with fallback)
+  if (!selectedMonth) {
+      return (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+             <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md">
+                <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Nenhum dado encontrado</h2>
+                <p className="text-gray-600 mb-6">Não foi possível carregar os dados mensais. Verifique a conexão com o banco de dados.</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="bg-v4-red text-white px-6 py-2 rounded-lg font-bold"
+                >
+                  Recarregar
+                </button>
+             </div>
           </div>
       );
   }
