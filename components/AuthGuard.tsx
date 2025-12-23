@@ -17,58 +17,42 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ onLogin, children }) => {
   const [configError, setConfigError] = useState(false);
 
   useEffect(() => {
-    // 1. Check configuration
+    // Check if configuration exists
     if (!isSupabaseConfigured) {
       setConfigError(true);
       return;
     }
 
-    // If Demo Mode, don't check session, wait for manual login
-    if (IS_DEMO_MODE) return;
-
-    // 2. Check active session (Real Mode)
+    // Attempt to recover session if it exists (optional, mostly for consistency)
     const initAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        setSession(session);
-        if (session?.user?.email) {
-          checkUser(session.user.email);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setSession(session);
+          if (session.user.email) {
+            checkUser(session.user.email);
+          }
         }
-      } catch (err: any) {
-        console.error("Auth initialization error:", err);
-        if (err.message === 'Failed to fetch') {
-          setConfigError(true);
-        }
+      } catch (err) {
+        console.error("Auth init error", err);
       }
     };
-
     initAuth();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session?.user?.email) {
-        checkUser(session.user.email);
-      }
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   const checkUser = (email: string) => {
     const lowerEmail = email.toLowerCase();
     
-    // Allow any email in Demo Mode for testing, but enforce domain check visually
+    // Check Domain
     if (!lowerEmail.endsWith('@v4company.com')) {
-      setMessage('Access Restricted: Only @v4company.com emails allowed.');
-      if (!IS_DEMO_MODE) supabase.auth.signOut();
+      setMessage('Acesso restrito a emails @v4company.com');
       return;
     }
     
+    // Determine Role
     const role = ADMIN_EMAILS.includes(lowerEmail) ? 'admin' : 'viewer';
+    
+    // Grant Access Immediately
     onLogin({ email: lowerEmail, role });
   };
 
@@ -79,44 +63,19 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ onLogin, children }) => {
 
     const lowerEmail = email.toLowerCase();
 
+    // 1. Simple Domain Validation
     if (!lowerEmail.endsWith('@v4company.com')) {
-      setMessage('Acesso restrito a emails @v4company.com');
+      setMessage('É necessário um e-mail @v4company.com para acessar.');
       setLoading(false);
       return;
     }
 
-    // --- DEMO MODE LOGIN ---
-    if (IS_DEMO_MODE) {
-      setTimeout(() => {
-        setLoading(false);
-        // Simulate successful login
-        setSession({ user: { email: lowerEmail } });
-        checkUser(lowerEmail);
-      }, 800);
-      return;
-    }
-
-    // --- REAL MODE LOGIN ---
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: lowerEmail,
-        options: {
-          emailRedirectTo: window.location.origin,
-        },
-      });
-
-      if (error) throw error;
-      setMessage('Link de acesso enviado! Verifique seu email.');
-    } catch (err: any) {
-      if (err.message === 'Failed to fetch') {
-         setMessage('Erro de conexão. Verifique a configuração do Supabase.');
-         setConfigError(true);
-      } else {
-         setMessage(err.message);
-      }
-    } finally {
+    // 2. Direct Access (Bypass OTP/Magic Link)
+    // We simulate a network delay for UX, then log the user in directly.
+    setTimeout(() => {
       setLoading(false);
-    }
+      checkUser(lowerEmail);
+    }, 600);
   };
 
   if (configError && !IS_DEMO_MODE) {
@@ -130,7 +89,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ onLogin, children }) => {
            </div>
            <h2 className="text-2xl font-bold text-gray-800 mb-2">Configuração Pendente</h2>
            <p className="text-gray-600 mb-6">
-             Não foi possível conectar ao banco de dados. Isso geralmente acontece quando as variáveis de ambiente não estão configuradas.
+             Não foi possível conectar ao banco de dados. Verifique as chaves de API.
            </p>
            <button 
              onClick={() => window.location.reload()}
@@ -143,6 +102,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ onLogin, children }) => {
     );
   }
 
+  // If we have a session from a previous real login, just pass through
   if (session) {
     return <>{children}</>;
   }
@@ -169,9 +129,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ onLogin, children }) => {
             V4 Prates Hanzava
           </h2>
           <p className="text-center text-gray-500 mb-8 text-sm">
-            {IS_DEMO_MODE 
-              ? "Modo de Visualização (Dados Locais)" 
-              : "Acesso Restrito V4 Company"}
+            Commercial Intelligence Platform
           </p>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -184,7 +142,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ onLogin, children }) => {
                   type="email"
                   required
                   className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-red focus:border-transparent outline-none transition-all"
-                  placeholder="admin@v4company.com"
+                  placeholder="seu.nome@v4company.com"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -196,7 +154,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ onLogin, children }) => {
             </div>
 
             {message && (
-              <div className={`flex items-center gap-2 text-sm p-3 rounded-lg ${message.includes('enviado') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+              <div className="flex items-center gap-2 text-sm p-3 rounded-lg bg-red-50 text-red-600">
                 <AlertCircle className="w-4 h-4" />
                 {message}
               </div>
@@ -208,17 +166,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ onLogin, children }) => {
               className="w-full bg-v4-red text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
-              {loading 
-                ? 'Entrando...' 
-                : IS_DEMO_MODE ? 'Entrar (Demo)' : 'Receber Link de Acesso'}
+              {loading ? 'Acessando...' : 'Acessar Plataforma'}
             </button>
           </form>
-
-          <div className="mt-6 text-center text-xs text-gray-400 border-t border-gray-100 pt-4">
-            {IS_DEMO_MODE 
-              ? "Dica: Use vinicius.hanzava@v4company.com para acesso Admin" 
-              : "Funciona apenas com domínios @v4company.com"}
-          </div>
+          
+          {/* Removed restriction text as requested */}
         </div>
       </div>
     </div>
