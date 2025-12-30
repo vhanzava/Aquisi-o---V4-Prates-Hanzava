@@ -9,7 +9,7 @@ import { LeadBrokerSection } from './components/LeadBrokerSection';
 import { DealBrokerSection } from './components/DealBrokerSection';
 import { UserProfile, Deal, FunnelStats, MonthData, DealStatus, DealType, FunnelType } from './types';
 import { useSupabaseData } from './hooks/useSupabaseData';
-import { LayoutGrid, Users, LogOut, ChevronDown, ChevronRight, BarChart3, Coins, CalendarDays, Loader2, AlertCircle, WifiOff } from 'lucide-react';
+import { LayoutGrid, Users, LogOut, ChevronDown, ChevronRight, BarChart3, Coins, CalendarDays, Loader2, AlertCircle, WifiOff, Sparkles, Check, Copy } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const App: React.FC = () => {
@@ -18,6 +18,9 @@ const App: React.FC = () => {
   const [selectedMonthId, setSelectedMonthId] = useState<string>(''); // Set after load
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [expandedYear, setExpandedYear] = useState<number | null>(2025);
+  
+  // Export State
+  const [isCopied, setIsCopied] = useState(false);
 
   // Supabase Data Hook
   const { 
@@ -114,6 +117,46 @@ const App: React.FC = () => {
         });
     } else {
         updateFunnel(id, field, value);
+    }
+  };
+
+  // --- EXPORT FUNCTIONALITY ---
+  const handleExportForAI = async () => {
+    // 1. Prepare Data Structure
+    const exportData = {
+      context: "V4 Prates Hanzava - Dashboard Comercial",
+      generated_at: new Date().toISOString(),
+      data: {
+        months_config: months,
+        deals: allDeals,
+        funnel_performance: allFunnelStats
+      }
+    };
+
+    // 2. Create the Prompt Wrapper
+    const promptText = `
+[CONTEXTO PARA IA]
+Abaixo estão os dados brutos (JSON) exportados do Dashboard Comercial da unidade V4 Prates Hanzava.
+Este conjunto de dados contém:
+1. "months_config": Metas financeiras, investimento e configurações de cada mês.
+2. "deals": Lista de contratos/negócios (status, valores de MRR e Escopo, datas, canal de aquisição).
+3. "funnel_performance": Métricas do funil de vendas (leads, reuniões, vendas, etc) por canal.
+
+[SUA TAREFA]
+Use esses dados para responder perguntas sobre performance, faturamento, gargalos de funil e projeções. Mantenha as respostas focadas em insights de negócios.
+
+[DADOS JSON]
+${JSON.stringify(exportData, null, 2)}
+    `.trim();
+
+    // 3. Copy to Clipboard
+    try {
+      await navigator.clipboard.writeText(promptText);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy to clipboard', err);
+      alert('Erro ao copiar. Seu navegador pode não suportar essa função.');
     }
   };
 
@@ -281,8 +324,24 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              {/* User Info */}
+              {/* User Info & Actions */}
               <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
+                 
+                 {/* EXPORT BUTTON */}
+                 <button
+                    onClick={handleExportForAI}
+                    className={`
+                      hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all mr-2
+                      ${isCopied 
+                        ? 'bg-green-50 border-green-200 text-green-700' 
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-v4-red hover:border-red-100'}
+                    `}
+                    title="Copiar dados para IA"
+                 >
+                    {isCopied ? <Check className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                    {isCopied ? 'Copiado!' : 'Exportar IA'}
+                 </button>
+
                  <div className="text-right hidden sm:block">
                    <p className="text-xs font-medium text-gray-500">{user?.role === 'admin' ? 'Administrator' : 'Viewer'}</p>
                    <p className="text-sm font-bold text-gray-900">{user?.email.split('@')[0]}</p>
