@@ -18,6 +18,8 @@ export enum FunnelType {
   INDICATION = 'Indication'
 }
 
+export type PipelineType = 'acquisition' | 'monetization';
+
 export interface MonthData {
   id: string; // '2025-10'
   name: string;
@@ -25,16 +27,17 @@ export interface MonthData {
   slug: string;
   working_days: number;
   
-  // Goals
-  unit_goal_mrr: number;
-  matrix_goal_mrr: number;
-  unit_goal_monetization: number;
-  matrix_goal_monetization: number;
+  // Goals (Revenue)
+  unit_goal_mrr: number; // Corrected to match DB/Legacy
+  matrix_goal_mrr: number; // Corrected to match DB/Legacy
+  
+  // Base Revenue (Input Manual)
+  // "MRR Inicial + Monetização Base"
+  manual_base_revenue?: number; 
 
-  // Manual Overrides
-  manual_current_mrr?: number;
-  manual_monetization_current?: number;
-  manual_monetization_projected?: number;
+  // Legacy/Other fields
+  unit_goal_monetization?: number;
+  matrix_goal_monetization?: number;
 
   // Lead Broker
   broker_planned_investment?: number;
@@ -49,12 +52,16 @@ export interface MonthData {
 export interface Deal {
   id: string; // UUID
   month_id: string;
+  pipeline_type: PipelineType; // New field to separate lists
   client_name: string;
   status: DealStatus;
   type: DealType;
-  value_mrr: number;
-  value_fixed: number;
-  value_monetization: number;
+  
+  // Unified Values for both Pipelines
+  value_mrr: number;   // In Acquisition: MRR. In Monetization: Assessoria
+  value_fixed: number; // In Acquisition: Escopo Fechado. In Monetization: Escopo Fechado
+  
+  value_monetization?: number; // Deprecated/Legacy
   acquisition_channel: FunnelType;
   sign_date?: string;
   start_date?: string;

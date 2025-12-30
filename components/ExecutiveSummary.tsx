@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { MonthData, Deal, DealStatus } from '../types';
-import { DollarSign, TrendingUp, Target, Briefcase, Edit2, Coins } from 'lucide-react';
+import { DollarSign, TrendingUp, Target, Briefcase, Edit2, Coins, PieChart, History } from 'lucide-react';
 
 interface ExecutiveSummaryProps {
   variant: 'acquisition' | 'monetization';
@@ -10,20 +11,33 @@ interface ExecutiveSummaryProps {
   onUpdateMonth: (field: keyof MonthData, value: number) => void;
 }
 
-const EditableCard: React.FC<{
-  title: string;
-  value: number;
-  isEditable?: boolean;
+// Dynamic Vertical Bar Component with Inline Editing
+const VerticalGoal: React.FC<{ 
+  current: number; 
+  target: number; 
+  color: string; 
+  label: string;
   isAdmin: boolean;
-  icon: React.ReactNode;
-  subtitle?: React.ReactNode;
-  progress?: number;
-  variantColor: string;
-  onSave?: (val: number) => void;
-  size?: 'normal' | 'small';
-}> = ({ title, value, isEditable, isAdmin, icon, subtitle, progress, variantColor, onSave, size = 'normal' }) => {
+  onSave: (val: number) => void;
+}> = ({ current, target, color, label, isAdmin, onSave }) => {
+  // State for inline editing
   const [isEditing, setIsEditing] = useState(false);
-  const [localValue, setLocalValue] = useState(value);
+  const [localValue, setLocalValue] = useState(target.toString());
+
+  // Update local value if target changes externally
+  useEffect(() => {
+    setLocalValue(target.toString());
+  }, [target]);
+
+  // Determine the scale max to accommodate both target and current (with some headroom)
+  const safeTarget = target || 1;
+  const maxValue = Math.max(safeTarget, current) * 1.15; // 15% headroom
+  
+  const targetPercent = (safeTarget / maxValue) * 100;
+  const currentPercent = (current / maxValue) * 100;
+
+  const percentAchieved = (current / safeTarget) * 100;
+  const isAchieved = current >= safeTarget;
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
@@ -31,18 +45,142 @@ const EditableCard: React.FC<{
 
   const handleBlur = () => {
     setIsEditing(false);
-    if (localValue !== value && onSave) {
-      onSave(Number(localValue));
+    const parsed = parseFloat(localValue);
+    if (!isNaN(parsed) && parsed !== target) {
+      onSave(parsed);
+    } else {
+      setLocalValue(target.toString()); // Revert if invalid or no change
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleBlur();
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center h-full w-full max-w-[120px]">
+      {/* Header / Edit - Added relative and z-20 to ensure it sits above the chart */}
+      <div className="text-center mb-2 relative z-20 w-full flex flex-col items-center min-h-[40px] justify-end">
+        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1">{label}</span>
+        
+        {isEditing ? (
+           <input
+             autoFocus
+             type="number"
+             className="w-24 text-center font-bold text-xs bg-white border border-gray-300 rounded shadow-sm outline-none px-1 py-1 focus:ring-2 focus:ring-v4-red"
+             value={localValue}
+             onChange={(e) => setLocalValue(e.target.value)}
+             onBlur={handleBlur}
+             onKeyDown={handleKeyDown}
+           />
+        ) : (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isAdmin) {
+                setLocalValue(target.toString());
+                setIsEditing(true);
+              }
+            }}
+            disabled={!isAdmin}
+            className={`group text-xs font-bold transition-all flex items-center justify-center gap-2 mx-auto px-3 py-1 rounded-md border border-transparent ${isAdmin ? 'hover:bg-gray-50 hover:border-gray-200 cursor-pointer text-gray-700' : 'text-gray-600'}`}
+            title={isAdmin ? "Clique para editar a meta" : ""}
+            type="button"
+          >
+             {formatCurrency(target)}
+             {isAdmin && <Edit2 className="w-3 h-3 text-gray-300 group-hover:text-gray-500" />}
+          </button>
+        )}
+      </div>
+
+      {/* Chart Container */}
+      <div className="relative w-full flex-1 min-h-[140px] bg-gray-50 rounded-md border border-gray-100 mx-auto overflow-hidden group z-10">
+         
+         {/* Grid Lines (Optional decoration) */}
+         <div className="absolute inset-0 flex flex-col justify-between p-2 opacity-10 pointer-events-none">
+            <div className="border-t border-gray-400 w-full"></div>
+            <div className="border-t border-gray-400 w-full"></div>
+            <div className="border-t border-gray-400 w-full"></div>
+         </div>
+
+         {/* Target Line Indicator */}
+         <div 
+            className="absolute left-0 right-0 border-t-2 border-dashed border-gray-400 z-10 flex items-center justify-end pr-1 transition-all duration-700"
+            style={{ bottom: `${targetPercent}%` }}
+         >
+            <span className="bg-white/80 backdrop-blur-sm text-[9px] text-gray-500 px-1.5 py-0.5 -mt-5 rounded border border-gray-200 shadow-sm font-medium">Meta</span>
+         </div>
+
+         {/* The Bar */}
+         <div 
+           className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-10 rounded-t-md transition-all duration-1000 ease-out shadow-sm"
+           style={{ 
+             height: `${currentPercent}%`, 
+             backgroundColor: color,
+             opacity: isAchieved ? 1 : 0.85
+           }}
+         >
+            {/* Tooltip-ish Value on top of bar */}
+            <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-xs font-bold whitespace-nowrap drop-shadow-sm bg-white/90 px-1.5 py-0.5 rounded shadow-sm border border-gray-100 text-gray-800 z-30">
+               {percentAchieved.toFixed(0)}%
+            </div>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+// Improved EditableCard using string state for input
+const EditableCard: React.FC<{
+  title: string;
+  value: number;
+  isEditable?: boolean;
+  isAdmin: boolean;
+  icon: React.ReactNode;
+  subtitle?: React.ReactNode;
+  variantColor: string;
+  onSave?: (val: number) => void;
+  highlight?: boolean;
+}> = ({ title, value, isEditable, isAdmin, icon, subtitle, variantColor, onSave, highlight }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [localValue, setLocalValue] = useState(value.toString());
+
+  // Keep local value in sync if props change (unless editing)
+  useEffect(() => {
+     if (!isEditing) setLocalValue(value.toString());
+  }, [value, isEditing]);
+
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
+  };
+
+  const startEditing = () => {
+    if (isEditable && isAdmin) {
+      setLocalValue(value.toString());
+      setIsEditing(true);
+    }
+  };
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    const parsed = parseFloat(localValue);
+    if (!isNaN(parsed) && parsed !== value && onSave) {
+      onSave(parsed);
+    } else {
+      setLocalValue(value.toString()); // Revert if invalid or no change
     }
   };
 
   const themeClass = variantColor.replace('text-', '');
-
+  
   return (
-    <div className={`bg-white ${size === 'small' ? 'p-4' : 'p-6'} rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-full relative group hover:border-${themeClass} transition-colors`}>
-      <div className="flex justify-between items-start mb-2">
+    <div className={`bg-white rounded-xl shadow-sm border ${highlight ? `border-${themeClass} bg-${themeClass}/5` : 'border-gray-100'} flex flex-col justify-between h-full relative group hover:border-${themeClass} transition-colors p-5`}>
+      <div className="flex justify-between items-start mb-1">
         <div className="w-full">
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
             {title}
             {isEditable && isAdmin && <Edit2 className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100" />}
           </p>
@@ -50,46 +188,28 @@ const EditableCard: React.FC<{
           {isEditing ? (
             <input
               autoFocus
-              className={`text-${size === 'small' ? 'lg' : '2xl'} font-bold text-gray-900 mt-1 w-full bg-transparent border-none outline-none p-0 focus:ring-0 appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+              className="font-bold text-gray-900 mt-1 w-full bg-transparent border-none outline-none p-0 focus:ring-0 appearance-none text-2xl"
               value={localValue}
-              onChange={(e) => setLocalValue(Number(e.target.value))}
+              onChange={(e) => setLocalValue(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
               style={{ MozAppearance: 'textfield' }} 
             />
           ) : (
             <h3 
-              className={`text-${size === 'small' ? 'lg' : '2xl'} font-bold text-gray-900 mt-1 ${isEditable && isAdmin ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
-              onClick={() => isEditable && isAdmin && setIsEditing(true)}
+              className={`font-bold text-gray-900 mt-1 text-2xl ${isEditable && isAdmin ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
+              onClick={startEditing}
             >
               {formatCurrency(value)}
             </h3>
           )}
         </div>
-        <div className={`p-2 rounded-lg bg-gray-50 flex-shrink-0`}>
+        <div className={`p-2 rounded-lg ${highlight ? 'bg-white shadow-sm' : 'bg-gray-50'} flex-shrink-0`}>
           {icon}
         </div>
       </div>
       
-      {(subtitle || progress !== undefined) && (
-        <div>
-          {subtitle}
-          {progress !== undefined && (
-            <div className="mt-2">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Progresso</span>
-                <span>{progress.toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className={`h-2.5 rounded-full ${progress < 50 ? 'bg-red-500' : progress < 80 ? 'bg-yellow-500' : 'bg-green-500'}`} 
-                  style={{ width: `${Math.min(progress, 100)}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {subtitle && <div className="mt-1">{subtitle}</div>}
     </div>
   );
 };
@@ -97,8 +217,10 @@ const EditableCard: React.FC<{
 export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, month, deals, isAdmin, onUpdateMonth }) => {
   const isAcquisition = variant === 'acquisition';
   const themeColor = isAcquisition ? 'text-v4-red' : 'text-amber-600';
+  const hexColor = isAcquisition ? '#E30613' : '#d97706';
+  const borderColor = isAcquisition ? 'border-v4-red' : 'border-amber-600';
 
-  // 1. Calculate Signed Totals
+  // 1. CALCULATIONS
   const signedMRR = deals
     .filter(d => d.status === DealStatus.SIGNED)
     .reduce((sum, d) => sum + d.value_mrr, 0);
@@ -107,110 +229,148 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
     .filter(d => d.status === DealStatus.SIGNED)
     .reduce((sum, d) => sum + d.value_fixed, 0);
 
-  const signedMonetization = deals
-    .filter(d => d.status === DealStatus.SIGNED)
-    .reduce((sum, d) => sum + (d.value_monetization || 0), 0);
+  const closedThisMonth = signedMRR + signedFixed;
 
-  const signedPendingMonetization = deals
-    .filter(d => d.status === DealStatus.SIGNED || d.status === DealStatus.PENDING)
-    .reduce((sum, d) => sum + (d.value_monetization || 0), 0);
+  // REVISED LOGIC:
+  const previousMonthMRR = month.manual_base_revenue || 0;
+  const currentTotalRevenue = previousMonthMRR + closedThisMonth;
 
-  // 2. Main KPI (Card 1) - Support Manual Override for MRR/Monetization Only
-  let mainKpiValue = 0;
-  if (isAcquisition) {
-    mainKpiValue = month.manual_current_mrr !== undefined ? month.manual_current_mrr : signedMRR;
-  } else {
-    mainKpiValue = month.manual_monetization_current !== undefined ? month.manual_monetization_current : signedMonetization;
-  }
-  
-  const mainKpiLabel = isAcquisition ? "MRR Atual" : "Monetização Atual";
-  const mainKpiField = isAcquisition ? 'manual_current_mrr' : 'manual_monetization_current';
-
-  // 3. Secondary KPI (Card 2)
-  let secondaryKpiValue = 0;
-  let isSecondaryEditable = false;
-
-  if (isAcquisition) {
-    // Faturamento Atual = Calculated strictly
-    secondaryKpiValue = signedMRR + signedFixed;
-    isSecondaryEditable = false; 
-  } else {
-    // Monetization Projected = Can be override
-    secondaryKpiValue = month.manual_monetization_projected !== undefined ? month.manual_monetization_projected : signedPendingMonetization;
-    isSecondaryEditable = true;
-  }
-  
-  const secondaryKpiLabel = isAcquisition ? "Faturamento Atual" : "Monetização Projetada";
-  const secondaryKpiSub = isAcquisition ? "(MRR + Escopo Assinado)" : "(Assinado + Pendente)";
-  const secondaryKpiField = 'manual_monetization_projected';
-
-  // 4. Goals & Progress
-  // LOGIC CHANGE: The User wants the Goal Progress to be based on TOTAL SIGNED CONTRACTS (MRR + Fixed), 
-  // NOT the MRR Atual (which might be manual).
-  const unitGoal = isAcquisition ? month.unit_goal_mrr : month.unit_goal_monetization;
-  const matrixGoal = isAcquisition ? month.matrix_goal_mrr : month.matrix_goal_monetization;
-
-  const totalRevenueForGoal = isAcquisition ? (signedMRR + signedFixed) : mainKpiValue; // For Mon, keeping mainKpi as basis for now
-
-  const unitProgress = unitGoal > 0 ? (totalRevenueForGoal / unitGoal) * 100 : 0;
-  const matrixProgress = matrixGoal > 0 ? (totalRevenueForGoal / matrixGoal) * 100 : 0;
+  // Goals - DATA SAFETY FALLBACK
+  // If the new 'unit_goal_mrr' is 0, we check if there's a legacy value (unit_goal_monetization or others we might map)
+  // This ensures no visual regression while DB migrates.
+  const unitGoal = month.unit_goal_mrr || month.unit_goal_monetization || 1;
+  const matrixGoal = month.matrix_goal_mrr || month.matrix_goal_monetization || 1;
 
   return (
-    <div className="space-y-6 mb-8">
+    <div className="space-y-4 mb-8">
       {/* Title */}
       <h2 className={`text-xl font-bold flex items-center gap-2 ${themeColor}`}>
         {isAcquisition ? <Briefcase className="w-6 h-6" /> : <Coins className="w-6 h-6" />}
         {isAcquisition ? "Resumo de Aquisição" : "Resumo de Monetização"}
       </h2>
 
-      {/* Main KPI Grid */}
+      {/* ROW 1: STRATEGIC INDICATORS */}
+      <div className={`${isAcquisition ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "flex justify-center"}`}>
+        
+        {/* BLOCK 1: FATURAMENTO ATUAL (Custom Centered Layout) */}
+        {isAcquisition && (
+          <div className="h-full">
+            <div className={`bg-white rounded-xl shadow-sm border ${borderColor} h-full p-6 relative overflow-hidden flex flex-col justify-center items-center text-center`}>
+              
+              {/* Top Label */}
+              <div className="flex items-center gap-2 mb-2">
+                 <TrendingUp className={`w-5 h-5 ${themeColor}`} />
+                 <span className={`text-sm font-bold uppercase tracking-widest ${themeColor}`}>Faturamento Atual</span>
+              </div>
+
+              {/* Big Main Number */}
+              <h1 className="text-5xl font-extrabold text-gray-900 mb-6 tracking-tight">
+                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(currentTotalRevenue)}
+              </h1>
+
+              {/* Breakdown Grid */}
+              <div className="flex items-center justify-center gap-8 w-full border-t border-gray-100 pt-4">
+                 <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold">Base (Mês Anterior)</span>
+                    <span className="text-lg font-bold text-gray-600 flex items-center gap-1">
+                       <History className="w-3 h-3 text-gray-400" />
+                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(previousMonthMRR)}
+                    </span>
+                 </div>
+                 <div className="h-8 w-px bg-gray-200"></div>
+                 <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-green-600/70 uppercase font-semibold">Novos (Neste Mês)</span>
+                    <span className="text-lg font-bold text-green-600 flex items-center gap-1">
+                       <DollarSign className="w-3 h-3" />
+                       +{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(closedThisMonth)}
+                    </span>
+                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BLOCK 2: GOALS (Dynamic Vertical Bars) */}
+        <div className={isAcquisition ? "h-full" : "w-full md:w-1/2"}>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full min-h-[240px]">
+             
+             {/* Header */}
+             <div className="flex justify-between items-center mb-4 border-b border-gray-50 pb-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                  <Target className="w-4 h-4 text-gray-400" />
+                  Atingimento de Metas
+                </p>
+             </div>
+             
+             <div className="flex items-end justify-center h-full gap-8 md:gap-16 pb-2">
+                {/* Unit Goal */}
+                <VerticalGoal 
+                   label="Meta Unidade"
+                   current={currentTotalRevenue}
+                   target={unitGoal}
+                   color={hexColor}
+                   isAdmin={isAdmin}
+                   onSave={(val) => onUpdateMonth('unit_goal_mrr', val)}
+                />
+
+                {/* Matrix Goal */}
+                <VerticalGoal 
+                   label="Meta Matriz"
+                   current={currentTotalRevenue}
+                   target={matrixGoal}
+                   color="#1A1A1A"
+                   isAdmin={isAdmin}
+                   onSave={(val) => onUpdateMonth('matrix_goal_mrr', val)}
+                />
+             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ROW 2: BREAKDOWN (4 Columns) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* KPI 1: MRR/Monetization Current */}
+        
+        {/* Card 1: Fechado no Mês */}
         <EditableCard 
-          title={mainKpiLabel} 
-          value={mainKpiValue} 
+          title="Fechado no Mês" 
+          value={closedThisMonth} 
+          isAdmin={isAdmin} 
+          isEditable={false} 
+          variantColor={themeColor}
+          icon={<DollarSign className="w-4 h-4 text-green-600" />}
+          subtitle={<span className="text-[10px] text-green-600 font-bold uppercase">Assessoria + Escopo</span>}
+        />
+
+        {/* Card 2: MRR (Assessoria) Only */}
+        <EditableCard 
+          title={isAcquisition ? "MRR (Novo)" : "Assessoria (Novo)"} 
+          value={signedMRR} 
           isAdmin={isAdmin}
+          isEditable={false} 
+          variantColor="text-blue-600"
+          icon={<Briefcase className="w-4 h-4 text-blue-400" />}
+        />
+
+        {/* Card 3: Fixed (Escopo) Only */}
+        <EditableCard 
+          title={isAcquisition ? "Escopo (Novo)" : "Escopo (Novo)"} 
+          value={signedFixed} 
+          isAdmin={isAdmin} 
+          isEditable={false} 
+          variantColor="text-purple-600"
+          icon={<PieChart className="w-4 h-4 text-purple-400" />}
+        />
+
+        {/* Card 4: MRR Mês Anterior (Manual Input - Replaces "Na Rua") */}
+        <EditableCard 
+          title="MRR Mês Anterior" 
+          value={previousMonthMRR} 
+          isAdmin={isAdmin} 
           isEditable={true} 
-          variantColor={themeColor}
-          onSave={(val) => onUpdateMonth(mainKpiField as keyof MonthData, val)}
-          icon={isAcquisition ? <DollarSign className={`w-6 h-6 ${themeColor}`} /> : <Coins className={`w-6 h-6 ${themeColor}`} />}
-          subtitle={<span className="text-xs text-gray-500">Contratos assinados (ou Manual)</span>}
-        />
-
-        {/* KPI 2: Revenue/Projection */}
-        <EditableCard 
-          title={secondaryKpiLabel} 
-          value={secondaryKpiValue} 
-          isAdmin={isAdmin} 
-          isEditable={isSecondaryEditable}
-          variantColor={themeColor}
-          onSave={isSecondaryEditable ? (val) => onUpdateMonth(secondaryKpiField as keyof MonthData, val) : undefined}
-          icon={<TrendingUp className="w-6 h-6 text-blue-600" />}
-          subtitle={<span className="text-xs text-gray-500">{secondaryKpiSub}</span>}
-        />
-
-        {/* Unit Goal */}
-        <EditableCard 
-          title={`Meta Unidade (${isAcquisition ? 'Total' : 'Monet.'})`} 
-          value={unitGoal || 0} 
-          isEditable 
-          isAdmin={isAdmin} 
-          variantColor={themeColor}
-          onSave={(val) => onUpdateMonth(isAcquisition ? 'unit_goal_mrr' : 'unit_goal_monetization', val)}
-          icon={<Target className="w-5 h-5 text-gray-400" />}
-          progress={unitProgress}
-        />
-
-        {/* Matrix Goal */}
-        <EditableCard 
-          title={`Meta Matriz (${isAcquisition ? 'Total' : 'Monet.'})`} 
-          value={matrixGoal || 0} 
-          isEditable 
-          isAdmin={isAdmin} 
-          variantColor={themeColor}
-          onSave={(val) => onUpdateMonth(isAcquisition ? 'matrix_goal_mrr' : 'matrix_goal_monetization', val)}
-          icon={<Briefcase className="w-5 h-5 text-gray-400" />}
-          progress={matrixProgress}
+          onSave={(val) => onUpdateMonth('manual_base_revenue', val)}
+          variantColor="text-gray-600"
+          icon={<History className="w-4 h-4 text-gray-500" />}
+          subtitle={<span className="text-[10px] text-gray-400">Base de Cálculo</span>}
         />
       </div>
     </div>

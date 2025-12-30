@@ -39,7 +39,24 @@ const App: React.FC = () => {
   }, [months, selectedMonthId]);
 
   const selectedMonth = months.find(m => m.id === selectedMonthId);
-  const currentDeals = allDeals.filter(d => d.month_id === selectedMonthId);
+
+  // FILTER DEALS BY TAB:
+  // - Acquisition: show deals with pipeline_type='acquisition' OR null/undefined (legacy)
+  // - Monetization: show deals with pipeline_type='monetization'
+  const currentDeals = allDeals.filter(d => {
+      const isMonetizationTab = currentTab === 'monetization';
+      
+      // Match ID
+      if (d.month_id !== selectedMonthId) return false;
+
+      // Match Pipeline Type
+      if (isMonetizationTab) {
+          return d.pipeline_type === 'monetization';
+      } else {
+          // Acquisition Tab (Default)
+          return d.pipeline_type === 'acquisition' || !d.pipeline_type;
+      }
+  });
   
   // Group months by year for selector
   const years = Array.from(new Set(months.map(m => m.year))).sort();
@@ -55,15 +72,20 @@ const App: React.FC = () => {
   };
 
   const handleAddDeal = () => {
-    const defaultType = currentTab === 'monetization' ? DealType.FIXED : DealType.RECURRING;
+    // Determine Pipeline Type
+    const pipelineType = currentTab === 'monetization' ? 'monetization' : 'acquisition';
+    
+    // Determine Default Deal Type
+    const defaultDealType = DealType.RECURRING;
+
     const newDeal: Partial<Deal> = {
       month_id: selectedMonthId,
-      client_name: 'Novo Cliente',
+      pipeline_type: pipelineType,
+      client_name: currentTab === 'monetization' ? 'Novo Contrato Monetização' : 'Novo Cliente',
       status: DealStatus.PENDING,
-      type: defaultType,
+      type: defaultDealType,
       value_mrr: 0,
       value_fixed: 0,
-      value_monetization: 0,
       acquisition_channel: FunnelType.OUTBOUND,
       sign_date: undefined,
       start_date: undefined,
@@ -110,7 +132,6 @@ const App: React.FC = () => {
       return <AuthGuard onLogin={setUser}>{null}</AuthGuard>;
   }
 
-  // --- LOADING STATE ---
   if (loading) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -122,7 +143,6 @@ const App: React.FC = () => {
       );
   }
 
-  // --- CRITICAL ERROR STATE (Sync Failed) ---
   if (error) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -138,9 +158,6 @@ const App: React.FC = () => {
                <br/><br/>
                <span className="text-sm bg-gray-100 p-2 rounded text-gray-700 font-mono">{error}</span>
              </p>
-             <div className="bg-blue-50 p-4 rounded-lg text-left text-sm text-blue-800 mb-6">
-                <strong>Atenção Admin:</strong> Como o login foi removido, você deve configurar as permissões do Supabase (RLS) para permitir acesso "Anônimo/Público" às tabelas, caso contrário os dados não serão salvos.
-             </div>
              <button 
                onClick={() => refresh()}
                className="bg-v4-red text-white px-8 py-3 rounded-lg font-bold hover:bg-red-700 transition-colors w-full"
@@ -152,20 +169,13 @@ const App: React.FC = () => {
       );
   }
 
-  // --- EMPTY STATE (Should catch if seed failed but didn't throw) ---
   if (!selectedMonth) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-gray-50">
              <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md">
                 <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Nenhum dado encontrado</h2>
-                <p className="text-gray-600 mb-6">A conexão foi feita, mas não há meses cadastrados.</p>
-                <button 
-                  onClick={() => refresh()}
-                  className="bg-v4-red text-white px-6 py-2 rounded-lg font-bold"
-                >
-                  Recarregar
-                </button>
+                <button onClick={() => refresh()} className="bg-v4-red text-white px-6 py-2 rounded-lg font-bold">Recarregar</button>
              </div>
           </div>
       );

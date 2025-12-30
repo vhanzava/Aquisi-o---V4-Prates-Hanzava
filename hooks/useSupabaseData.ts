@@ -82,7 +82,6 @@ export const useSupabaseData = (userEmail?: string) => {
   }, [userEmail]);
 
   // --- CRUD OPERATIONS ---
-  // We added error alerting to ensure users know if a save fails
 
   const updateMonth = async (id: string, field: keyof MonthData, value: any) => {
     // Optimistic Update
@@ -92,7 +91,7 @@ export const useSupabaseData = (userEmail?: string) => {
       const { error } = await supabase.from('months').update({ [field]: value }).eq('id', id);
       if (error) {
         console.error("Failed to save Month update:", error);
-        alert("Erro ao salvar alteração. Verifique sua conexão.");
+        alert(`Erro ao salvar alteração: ${error.message || JSON.stringify(error)}`);
         fetchData(); // Revert/Refresh
       }
     }

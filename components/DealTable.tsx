@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Deal, DealStatus, FunnelType } from '../types';
 import { Calendar, Plus, ChevronDown, LayoutList, Kanban as KanbanIcon } from 'lucide-react';
@@ -138,14 +139,9 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
     const filtered = deals.filter(d => d.status === status);
     const mrr = filtered.reduce((acc, d) => acc + d.value_mrr, 0);
     const fixed = filtered.reduce((acc, d) => acc + d.value_fixed, 0);
-    const monetization = filtered.reduce((acc, d) => acc + (d.value_monetization || 0), 0);
+    const total = mrr + fixed;
     
-    // For Acquisition: Total = MRR + Fixed.  For Monetization: Total = Monetization (simplify)
-    const total = isAcquisition ? (mrr + fixed) : monetization;
-    const col1 = isAcquisition ? mrr : monetization;
-    const col2 = isAcquisition ? fixed : 0; 
-    
-    return { total, col1, col2 };
+    return { total, mrr, fixed };
   };
 
   const signedStats = calculateStats(DealStatus.SIGNED);
@@ -192,7 +188,7 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
               }}
               className={`${headerBg} text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-opacity`}
             >
-              <Plus className="w-4 h-4" /> Novo Cliente
+              <Plus className="w-4 h-4" /> {isAcquisition ? 'Novo Cliente' : 'Novo Contrato'}
             </button>
           )}
         </div>
@@ -215,19 +211,14 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   <tr className="bg-white text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
                     <th className="p-4 font-medium w-32">Status</th>
                     <th className="p-4 font-medium">Nome do Cliente</th>
-                    {isAcquisition && <th className="p-4 font-medium w-40">Canal</th>}
+                    <th className="p-4 font-medium w-40">Canal</th>
                     
-                    {/* Variant Specific Columns */}
-                    {isAcquisition && <th className="p-4 font-medium">Escopo Fechado (R$)</th>}
-                    {isAcquisition && <th className="p-4 font-medium">Assessoria (R$)</th>}
+                    {/* Unified Columns for both variants */}
+                    <th className="p-4 font-medium">{isAcquisition ? 'Escopo Fechado (R$)' : 'Escopo/Projeto (R$)'}</th>
+                    <th className="p-4 font-medium">{isAcquisition ? 'Recorrente/MRR (R$)' : 'Assessoria/MRR (R$)'}</th>
                     
-                    {!isAcquisition && <th className="p-4 font-medium text-amber-700">Valor Monetização (R$)</th>}
-
                     <th className="p-4 font-medium">Data da Assinatura</th>
-                    
-                    {/* Hide Start Date if Monetization */}
-                    {isAcquisition && <th className="p-4 font-medium">Data de Início</th>}
-                    
+                    <th className="p-4 font-medium">Data de Início</th>
                     <th className="p-4 font-medium">Segmento</th>
                   </tr>
                 </thead>
@@ -251,51 +242,33 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                         />
                       </td>
                       
-                      {isAcquisition && (
-                        <td className="p-4 text-gray-500">
-                          <EditableCell 
-                            value={deal.acquisition_channel} 
-                            type="select"
-                            options={CHANNEL_OPTIONS}
-                            isAdmin={isAdmin} 
-                            onSave={(val) => onUpdateDeal(deal.id, 'acquisition_channel', val)} 
-                          />
-                        </td>
-                      )}
+                      <td className="p-4 text-gray-500">
+                        <EditableCell 
+                          value={deal.acquisition_channel} 
+                          type="select"
+                          options={CHANNEL_OPTIONS}
+                          isAdmin={isAdmin} 
+                          onSave={(val) => onUpdateDeal(deal.id, 'acquisition_channel', val)} 
+                        />
+                      </td>
 
-                      {/* Acquisition Columns */}
-                      {isAcquisition && (
-                        <td className="p-4 font-mono">
-                          <EditableCell 
-                            value={deal.value_fixed} 
-                            type="number"
-                            isAdmin={isAdmin} 
-                            onSave={(val) => onUpdateDeal(deal.id, 'value_fixed', val)} 
-                          />
-                        </td>
-                      )}
-                      {isAcquisition && (
-                        <td className="p-4 font-mono font-semibold">
-                          <EditableCell 
-                            value={deal.value_mrr} 
-                            type="number"
-                            isAdmin={isAdmin} 
-                            onSave={(val) => onUpdateDeal(deal.id, 'value_mrr', val)} 
-                          />
-                        </td>
-                      )}
-
-                      {/* Monetization Columns */}
-                      {!isAcquisition && (
-                        <td className="p-4 font-mono text-amber-700 bg-amber-50/30 font-bold">
-                          <EditableCell 
-                            value={deal.value_monetization || 0} 
-                            type="number"
-                            isAdmin={isAdmin} 
-                            onSave={(val) => onUpdateDeal(deal.id, 'value_monetization', val)} 
-                          />
-                        </td>
-                      )}
+                      <td className="p-4 font-mono">
+                        <EditableCell 
+                          value={deal.value_fixed} 
+                          type="number"
+                          isAdmin={isAdmin} 
+                          onSave={(val) => onUpdateDeal(deal.id, 'value_fixed', val)} 
+                        />
+                      </td>
+                      
+                      <td className="p-4 font-mono font-semibold">
+                        <EditableCell 
+                          value={deal.value_mrr} 
+                          type="number"
+                          isAdmin={isAdmin} 
+                          onSave={(val) => onUpdateDeal(deal.id, 'value_mrr', val)} 
+                        />
+                      </td>
 
                       <td className="p-4">
                         <EditableCell 
@@ -306,17 +279,14 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                         />
                       </td>
                       
-                      {/* Hide Start Date if Monetization */}
-                      {isAcquisition && (
-                        <td className="p-4">
-                          <EditableCell 
-                            value={deal.start_date || ''} 
-                            type="date"
-                            isAdmin={isAdmin} 
-                            onSave={(val) => onUpdateDeal(deal.id, 'start_date', val)} 
-                          />
-                        </td>
-                      )}
+                      <td className="p-4">
+                        <EditableCell 
+                          value={deal.start_date || ''} 
+                          type="date"
+                          isAdmin={isAdmin} 
+                          onSave={(val) => onUpdateDeal(deal.id, 'start_date', val)} 
+                        />
+                      </td>
 
                       <td className="p-4">
                         <EditableCell 
@@ -329,8 +299,8 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   ))}
                   {deals.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-gray-400 italic">
-                        Nenhum contrato encontrado.
+                      <td colSpan={8} className="p-8 text-center text-gray-400 italic">
+                        Nenhum contrato encontrado nesta categoria.
                       </td>
                     </tr>
                   )}
@@ -347,9 +317,9 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
               {/* Header Row for Summary */}
               <div className="grid grid-cols-4 gap-4 px-6 py-2 text-xs font-semibold text-gray-500 uppercase">
                   <div>Categoria</div>
-                  <div>Valor Total {isAcquisition ? '(MRR + Escopo)' : '(Monetização)'}</div>
-                  <div>{isAcquisition ? 'Valor MRR' : 'Valor Monetização'}</div>
-                  <div>{isAcquisition ? 'Valor Escopo Fechado' : '-'}</div>
+                  <div>Valor Total</div>
+                  <div>{isAcquisition ? 'Recorrente (MRR)' : 'Assessoria (MRR)'}</div>
+                  <div>{isAcquisition ? 'Escopo Fechado' : 'Escopo/Projeto'}</div>
               </div>
 
               {/* Signed Row */}
@@ -359,8 +329,8 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                     <span className="font-bold text-green-700">Assinado / Fechado</span>
                   </div>
                   <div className="font-mono font-bold text-gray-800">{formatCurrency(signedStats.total)}</div>
-                  <div className="font-mono text-gray-600">{formatCurrency(signedStats.col1)}</div>
-                  <div className="font-mono text-gray-600">{isAcquisition ? formatCurrency(signedStats.col2) : '-'}</div>
+                  <div className="font-mono text-gray-600">{formatCurrency(signedStats.mrr)}</div>
+                  <div className="font-mono text-gray-600">{formatCurrency(signedStats.fixed)}</div>
               </div>
 
               {/* Pending Row */}
@@ -370,8 +340,8 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                     <span className="font-bold text-yellow-700">Pendente / Na Rua</span>
                   </div>
                   <div className="font-mono font-bold text-gray-800">{formatCurrency(pendingStats.total)}</div>
-                  <div className="font-mono text-gray-600">{formatCurrency(pendingStats.col1)}</div>
-                  <div className="font-mono text-gray-600">{isAcquisition ? formatCurrency(pendingStats.col2) : '-'}</div>
+                  <div className="font-mono text-gray-600">{formatCurrency(pendingStats.mrr)}</div>
+                  <div className="font-mono text-gray-600">{formatCurrency(pendingStats.fixed)}</div>
               </div>
 
                 {/* Lost Row */}
@@ -381,8 +351,8 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                     <span className="font-bold text-gray-500">Perdido</span>
                   </div>
                   <div className="font-mono font-bold text-gray-400">{formatCurrency(lostStats.total)}</div>
-                  <div className="font-mono text-gray-400">{formatCurrency(lostStats.col1)}</div>
-                  <div className="font-mono text-gray-400">{isAcquisition ? formatCurrency(lostStats.col2) : '-'}</div>
+                  <div className="font-mono text-gray-400">{formatCurrency(lostStats.mrr)}</div>
+                  <div className="font-mono text-gray-400">{formatCurrency(lostStats.fixed)}</div>
               </div>
 
             </div>

@@ -19,9 +19,6 @@ const generateMonths = (): MonthData[] => {
     monthNames.forEach((name, index) => {
       const id = `${year}-${String(index + 1).padStart(2, '0')}`; // e.g., 2025-01
       
-      // Default Goals (can be adjusted)
-      const isFuture = year > 2025 || (year === 2025 && index > 9);
-      
       months.push({
         id,
         name,
@@ -30,8 +27,7 @@ const generateMonths = (): MonthData[] => {
         working_days: 22,
         unit_goal_mrr: 100000,
         matrix_goal_mrr: 150000,
-        unit_goal_monetization: 20000,
-        matrix_goal_monetization: 30000,
+        manual_base_revenue: 500000, // Example base revenue
         broker_planned_investment: 0,
         broker_realized_investment: 0,
         broker_leads_bought: 0,
@@ -50,15 +46,16 @@ export const MOCK_MONTHS: MonthData[] = generateMonths();
 const getMonthId = (year: number, monthIndex: number) => `${year}-${String(monthIndex).padStart(2, '0')}`;
 
 export const MOCK_DEALS: Deal[] = [
+  // --- ACQUISITION DEALS ---
   {
     id: 'd1',
     month_id: getMonthId(2025, 10), // Oct 2025
-    client_name: 'Elegance',
+    pipeline_type: 'acquisition',
+    client_name: 'Elegance (Acq)',
     status: DealStatus.SIGNED,
     type: DealType.RECURRING,
-    value_mrr: 0,
+    value_mrr: 2500,
     value_fixed: 8500,
-    value_monetization: 2500,
     acquisition_channel: FunnelType.LEAD_BROKER,
     sign_date: '2025-10-14',
     start_date: '2025-10-15',
@@ -67,67 +64,44 @@ export const MOCK_DEALS: Deal[] = [
   {
     id: 'd2',
     month_id: getMonthId(2025, 10), // Oct 2025
-    client_name: 'Mega Eletron',
+    pipeline_type: 'acquisition',
+    client_name: 'Mega Eletron (Acq)',
     status: DealStatus.PENDING,
     type: DealType.MIXED,
     value_mrr: 6517,
     value_fixed: 11000,
-    value_monetization: 500,
     acquisition_channel: FunnelType.LEAD_BROKER,
     sign_date: '',
     start_date: '',
     segment: 'Mobilidade'
   },
+  
+  // --- MONETIZATION DEALS (Different Clients) ---
   {
-    id: 'd3',
-    month_id: getMonthId(2025, 10), // Oct 2025
-    client_name: 'Contabil RX',
-    status: DealStatus.PENDING,
-    type: DealType.RECURRING,
-    value_mrr: 0,
-    value_fixed: 8500,
-    value_monetization: 0,
-    acquisition_channel: FunnelType.LEAD_BROKER,
-    segment: 'Financeiro'
-  },
-  {
-    id: 'd4',
-    month_id: getMonthId(2025, 10), // Oct 2025
-    client_name: 'TL Peças',
-    status: DealStatus.PENDING,
+    id: 'm1',
+    month_id: getMonthId(2025, 10),
+    pipeline_type: 'monetization',
+    client_name: 'Cliente Base Antiga A',
+    status: DealStatus.SIGNED,
     type: DealType.FIXED,
-    value_mrr: 3441,
-    value_fixed: 8500,
-    value_monetization: 0,
-    acquisition_channel: FunnelType.LEAD_BROKER,
-    segment: 'Veicular'
-  },
-  {
-    id: 'd5',
-    month_id: getMonthId(2025, 10), // Oct 2025
-    client_name: 'Higisul',
-    status: DealStatus.PENDING,
-    type: DealType.RECURRING,
-    value_mrr: 2529,
-    value_fixed: 8500,
-    value_monetization: 0,
-    acquisition_channel: FunnelType.OUTBOUND,
+    value_mrr: 0,
+    value_fixed: 15000, // Upsell de Escopo
+    acquisition_channel: FunnelType.INDICATION,
+    sign_date: '2025-10-05',
     segment: 'Varejo'
   },
-  // November Deals to show evolution
   {
-    id: 'd6',
-    month_id: getMonthId(2025, 11), // Nov 2025
-    client_name: 'Tech Future',
-    status: DealStatus.SIGNED,
+    id: 'm2',
+    month_id: getMonthId(2025, 10),
+    pipeline_type: 'monetization',
+    client_name: 'Cliente Base Antiga B',
+    status: DealStatus.PENDING,
     type: DealType.RECURRING,
-    value_mrr: 15000,
-    value_fixed: 5000,
-    value_monetization: 1000,
-    acquisition_channel: FunnelType.OUTBOUND,
-    sign_date: '2025-11-02',
-    start_date: '2025-11-05',
-    segment: 'SaaS'
+    value_mrr: 3000, // Upsell de Assessoria
+    value_fixed: 0, 
+    acquisition_channel: FunnelType.INDICATION,
+    sign_date: '',
+    segment: 'Serviços'
   }
 ];
 
@@ -139,7 +113,7 @@ export const MOCK_FUNNEL: FunnelStats[] = [
     leads: 450,
     leads_worked: 400,
     calls: 800,
-    call_duration_minutes: 1200, // 20 hours
+    call_duration_minutes: 1200, 
     connections: 120,
     meetings_scheduled: 45,
     meetings_realized: 30,
@@ -159,19 +133,5 @@ export const MOCK_FUNNEL: FunnelStats[] = [
     meetings_realized: 50,
     sales: 1,
     invested_amount: 5000 
-  },
-  {
-    id: 'f3',
-    month_id: getMonthId(2025, 10),
-    funnel_type: FunnelType.INDICATION,
-    leads: 10,
-    leads_worked: 10,
-    calls: 20,
-    call_duration_minutes: 60,
-    connections: 8,
-    meetings_scheduled: 5,
-    meetings_realized: 4,
-    sales: 0,
-    invested_amount: 0
   }
 ];

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { MonthData } from '../types';
 import { Edit2, Users, Activity, Wallet, Target } from 'lucide-react';
@@ -19,16 +20,26 @@ const EditableCard: React.FC<{
   size?: 'normal' | 'small';
 }> = ({ title, value, isEditable, isAdmin, icon, variantColor, onSave, size = 'normal' }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [localValue, setLocalValue] = useState(value);
+  const [localValue, setLocalValue] = useState(value.toString());
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
   };
 
+  const startEditing = () => {
+    if (isEditable && isAdmin) {
+      setLocalValue(value.toString());
+      setIsEditing(true);
+    }
+  };
+
   const handleBlur = () => {
     setIsEditing(false);
-    if (localValue !== value && onSave) {
-      onSave(Number(localValue));
+    const parsed = parseFloat(localValue);
+    if (!isNaN(parsed) && parsed !== value && onSave) {
+      onSave(parsed);
+    } else {
+      setLocalValue(value.toString());
     }
   };
 
@@ -48,7 +59,7 @@ const EditableCard: React.FC<{
               autoFocus
               className={`text-${size === 'small' ? 'lg' : '2xl'} font-bold text-gray-900 mt-1 w-full bg-transparent border-none outline-none p-0 focus:ring-0 appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
               value={localValue}
-              onChange={(e) => setLocalValue(Number(e.target.value))}
+              onChange={(e) => setLocalValue(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
               style={{ MozAppearance: 'textfield' }} 
@@ -56,7 +67,7 @@ const EditableCard: React.FC<{
           ) : (
             <h3 
               className={`text-${size === 'small' ? 'lg' : '2xl'} font-bold text-gray-900 mt-1 ${isEditable && isAdmin ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
-              onClick={() => isEditable && isAdmin && setIsEditing(true)}
+              onClick={startEditing}
             >
               {formatCurrency(value)}
             </h3>
