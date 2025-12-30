@@ -38,8 +38,9 @@ export const AnnualEvolution: React.FC<AnnualEvolutionProps> = ({ months, allDea
     
     const lbPlanned = month.broker_planned_investment || 0;
     const lbRealized = month.broker_realized_investment || 0;
+    const lbSpent = month.broker_amount_spent || 0; // Use spent amount for calc
     const lbLeads = month.broker_leads_bought || 0;
-    const lbCPL = lbLeads > 0 ? lbRealized / lbLeads : 0;
+    const lbCPL = lbLeads > 0 ? lbSpent / lbLeads : 0; // CPL calc updated
 
     // 3. Deal Broker Data
     const dealBrokerDeals = monthDeals.filter(d => d.acquisition_channel === FunnelType.DEAL_BROKER);
@@ -49,7 +50,7 @@ export const AnnualEvolution: React.FC<AnnualEvolutionProps> = ({ months, allDea
     const dbCount = month.deal_broker_deals_bought || 0;
 
     // 4. Consolidated Marketing
-    const totalMarketingInv = lbRealized + dbInv;
+    const totalMarketingInv = lbRealized + dbInv; // Invested is still what we realized (deposited)
     const totalMarketingRev = leadBrokerRevenue + dealBrokerRevenue;
     const roas = totalMarketingInv > 0 ? totalMarketingRev / totalMarketingInv : 0;
 
@@ -77,12 +78,13 @@ export const AnnualEvolution: React.FC<AnnualEvolutionProps> = ({ months, allDea
       'Escopo Fechado': fixed,
       'Monetização': monetization,
       'Total Faturado': totalRevenue,
-      'Meta Unidade': month.unit_goal_mrr, // Updated Key
+      'Meta Unidade': month.unit_goal_mrr, 
       'Meta Monetização': month.unit_goal_monetization || 0,
       
       // Lead Broker Keys
       'LB Planejado': lbPlanned,
       'LB Realizado': lbRealized,
+      'LB Gasto': lbSpent,
       'LB Leads': lbLeads,
       'LB CPL': lbCPL,
 
@@ -219,8 +221,7 @@ export const AnnualEvolution: React.FC<AnnualEvolutionProps> = ({ months, allDea
         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
            Evolução do Funil
         </h2>
-        {/* ... (Charts remain same structure, code omitted for brevity as it was correct in previous turn, ensuring compatibility) ... */}
-        {/* To save tokens, I'm including the full component but ensuring the goal key is updated */}
+        
          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 col-span-1 md:col-span-2">
               <h3 className="text-lg font-bold text-gray-800 mb-6 border-l-4 border-blue-500 pl-3">
@@ -282,8 +283,6 @@ export const AnnualEvolution: React.FC<AnnualEvolutionProps> = ({ months, allDea
             </div>
         </div>
       </div>
-      
-      {/* ... (Lead Broker / Deal Broker / Marketing sections omitted as they don't use goal keys) ... */}
     </div>
   );
 };

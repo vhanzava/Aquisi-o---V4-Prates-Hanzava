@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { MonthData } from '../types';
-import { Edit2, Users, Activity, Wallet, Target } from 'lucide-react';
+import { Edit2, Users, Activity, Wallet, Target, CreditCard } from 'lucide-react';
 
 interface LeadBrokerSectionProps {
   month: MonthData;
@@ -49,7 +49,7 @@ const EditableCard: React.FC<{
     <div className={`bg-white ${size === 'small' ? 'p-4' : 'p-6'} rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-full relative group hover:border-${themeClass} transition-colors`}>
       <div className="flex justify-between items-start mb-2">
         <div className="w-full">
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2 mb-1">
             {title}
             {isEditable && isAdmin && <Edit2 className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100" />}
           </p>
@@ -57,7 +57,7 @@ const EditableCard: React.FC<{
           {isEditing ? (
             <input
               autoFocus
-              className={`text-${size === 'small' ? 'lg' : '2xl'} font-bold text-gray-900 mt-1 w-full bg-transparent border-none outline-none p-0 focus:ring-0 appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+              className={`text-${size === 'small' ? 'lg' : '2xl'} font-bold text-gray-900 w-full bg-transparent border-none outline-none p-0 focus:ring-0 appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
               value={localValue}
               onChange={(e) => setLocalValue(e.target.value)}
               onBlur={handleBlur}
@@ -66,14 +66,14 @@ const EditableCard: React.FC<{
             />
           ) : (
             <h3 
-              className={`text-${size === 'small' ? 'lg' : '2xl'} font-bold text-gray-900 mt-1 ${isEditable && isAdmin ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
+              className={`text-${size === 'small' ? 'lg' : '2xl'} font-bold text-gray-900 ${isEditable && isAdmin ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
               onClick={startEditing}
             >
               {formatCurrency(value)}
             </h3>
           )}
         </div>
-        <div className={`p-2 rounded-lg bg-gray-50 flex-shrink-0`}>
+        <div className={`p-2 rounded-lg bg-gray-50 flex-shrink-0 ml-2`}>
           {icon}
         </div>
       </div>
@@ -87,15 +87,18 @@ export const LeadBrokerSection: React.FC<LeadBrokerSectionProps> = ({ month, isA
   // Logic
   const brokerPlanned = month.broker_planned_investment || 0;
   const brokerRealized = month.broker_realized_investment || 0;
+  const brokerSpent = month.broker_amount_spent || 0; // Novo campo
   const brokerLeads = month.broker_leads_bought || 0;
-  const brokerCPL = brokerLeads > 0 ? brokerRealized / brokerLeads : 0;
+  
+  // NEW CPL LOGIC: Valor Gasto / Leads
+  const brokerCPL = brokerLeads > 0 ? brokerSpent / brokerLeads : 0;
 
   return (
     <div className="bg-purple-50 rounded-xl p-6 border border-purple-100">
        <h3 className="font-bold text-purple-800 mb-4 flex items-center gap-2 text-lg">
          <Wallet className="w-6 h-6" /> Performance Lead Broker
        </h3>
-       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <EditableCard 
             title="Invest. Planejado"
             value={brokerPlanned}
@@ -116,38 +119,55 @@ export const LeadBrokerSection: React.FC<LeadBrokerSectionProps> = ({ month, isA
             icon={<Wallet className="w-4 h-4 text-purple-400" />}
             size="small"
           />
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 group relative hover:border-purple-600 transition-colors">
+          
+          {/* NEW CARD: Valor Gasto */}
+          <EditableCard 
+            title="Valor Gasto"
+            value={brokerSpent}
+            isAdmin={isAdmin}
+            isEditable={true}
+            variantColor="text-red-600"
+            onSave={(val) => onUpdateMonth('broker_amount_spent', val)}
+            icon={<CreditCard className="w-4 h-4 text-purple-400" />}
+            size="small"
+          />
+
+          {/* LEADS CARD */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 group relative hover:border-purple-600 transition-colors flex flex-col justify-between">
              <div className="flex justify-between items-start">
                <div className="w-full">
-                 <p className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
+                 <p className="text-xs font-medium text-gray-500 uppercase flex items-center gap-2 mb-1">
                     Leads Comprados
                     {isAdmin && <Edit2 className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100" />}
                  </p>
                  {isAdmin ? (
                     <input 
-                       className="text-lg font-bold text-gray-900 mt-1 w-full bg-transparent border-none outline-none p-0 focus:ring-0 [&::-webkit-inner-spin-button]:appearance-none" 
+                       className="text-lg font-bold text-gray-900 w-full bg-transparent border-none outline-none p-0 focus:ring-0 [&::-webkit-inner-spin-button]:appearance-none" 
                        type="number"
                        value={brokerLeads}
                        onChange={(e) => onUpdateMonth('broker_leads_bought', Number(e.target.value))}
                        style={{ MozAppearance: 'textfield' }}
                     />
                  ) : (
-                    <h3 className="text-lg font-bold text-gray-900 mt-1">{brokerLeads}</h3>
+                    <h3 className="text-lg font-bold text-gray-900">{brokerLeads}</h3>
                  )}
                </div>
-               <div className="p-2 rounded-lg bg-gray-50"><Users className="w-4 h-4 text-purple-400" /></div>
+               <div className="p-2 rounded-lg bg-gray-50 ml-2"><Users className="w-4 h-4 text-purple-400" /></div>
              </div>
           </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+
+          {/* CPL CARD */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
              <div className="flex justify-between items-start">
                <div>
-                 <p className="text-sm font-medium text-gray-500 uppercase">Custo por Lead (CPL)</p>
-                 <h3 className="text-lg font-bold text-gray-900 mt-1">
+                 <p className="text-xs font-medium text-gray-500 uppercase mb-1">Custo por Lead (CPL)</p>
+                 <h3 className="text-lg font-bold text-gray-900">
                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(brokerCPL)}
                  </h3>
                </div>
-               <div className="p-2 rounded-lg bg-gray-50"><Target className="w-4 h-4 text-purple-400" /></div>
+               <div className="p-2 rounded-lg bg-gray-50 ml-2"><Target className="w-4 h-4 text-purple-400" /></div>
              </div>
+             <p className="text-[10px] text-gray-400 mt-1">*Baseado no Valor Gasto</p>
           </div>
        </div>
     </div>

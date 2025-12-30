@@ -42,6 +42,7 @@ export interface MonthData {
   // Lead Broker
   broker_planned_investment?: number;
   broker_realized_investment?: number;
+  broker_amount_spent?: number; // New field: Valor Gasto (Ads consumido)
   broker_leads_bought?: number;
 
   // Deal Broker

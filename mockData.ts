@@ -30,6 +30,7 @@ const generateMonths = (): MonthData[] => {
         manual_base_revenue: 500000, // Example base revenue
         broker_planned_investment: 0,
         broker_realized_investment: 0,
+        broker_amount_spent: 0, // Initialize new field
         broker_leads_bought: 0,
         deal_broker_investment: 0,
         deal_broker_deals_bought: 0
