@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Deal, DealStatus, FunnelType } from '../types';
-import { Calendar, Plus, ChevronDown, LayoutList, Kanban as KanbanIcon } from 'lucide-react';
+import { Calendar, Plus, ChevronDown, LayoutList, Kanban as KanbanIcon, X as XIcon, Trash2 } from 'lucide-react';
 import { DealKanbanBoard } from './DealKanbanBoard';
 
 interface DealTableProps {
@@ -10,6 +10,7 @@ interface DealTableProps {
   variant: 'acquisition' | 'monetization';
   onUpdateDeal: (id: string, field: keyof Deal, value: any) => void;
   onAddDeal?: () => void;
+  onDeleteDeal?: (id: string) => void;
 }
 
 // Status Options
@@ -126,7 +127,7 @@ const EditableCell = ({
   );
 };
 
-export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDeal, variant, onAddDeal }) => {
+export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDeal, variant, onAddDeal, onDeleteDeal }) => {
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const isAcquisition = variant === 'acquisition';
   const themeColor = isAcquisition ? 'v4-red' : 'amber-500';
@@ -147,6 +148,12 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
   const signedStats = calculateStats(DealStatus.SIGNED);
   const pendingStats = calculateStats(DealStatus.PENDING);
   const lostStats = calculateStats(DealStatus.LOST);
+
+  const handleDelete = (id: string, name: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir o contrato "${name}"?`)) {
+      if (onDeleteDeal) onDeleteDeal(id);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -220,11 +227,12 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                     <th className="p-4 font-medium">Data da Assinatura</th>
                     <th className="p-4 font-medium">Data de Início</th>
                     <th className="p-4 font-medium">Segmento</th>
+                    {isAdmin && <th className="p-4 font-medium text-center w-12"></th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 text-sm text-gray-700">
                   {deals.map((deal) => (
-                    <tr key={deal.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={deal.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="p-4">
                         <EditableCell 
                           value={deal.status} 
@@ -295,11 +303,23 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                           onSave={(val) => onUpdateDeal(deal.id, 'segment', val)} 
                         />
                       </td>
+                      
+                      {isAdmin && (
+                        <td className="p-4 text-center">
+                          <button 
+                            onClick={() => handleDelete(deal.id, deal.client_name)}
+                            className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
+                            title="Excluir Contrato"
+                          >
+                             <XIcon className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {deals.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-gray-400 italic">
+                      <td colSpan={isAdmin ? 9 : 8} className="p-8 text-center text-gray-400 italic">
                         Nenhum contrato encontrado nesta categoria.
                       </td>
                     </tr>

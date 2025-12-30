@@ -298,25 +298,25 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
              <div className="flex justify-between items-center mb-4 border-b border-gray-50 pb-2">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
                   <Target className="w-4 h-4 text-gray-400" />
-                  Atingimento de Metas
+                  Atingimento de Metas (Fechado Mês)
                 </p>
              </div>
              
              <div className="flex items-end justify-center h-full gap-8 md:gap-16 pb-2">
-                {/* Unit Goal */}
+                {/* Unit Goal - Uses ONLY closedThisMonth per user request */}
                 <VerticalGoal 
                    label="Meta Unidade"
-                   current={currentTotalRevenue}
+                   current={closedThisMonth} 
                    target={unitGoal}
                    color={hexColor}
                    isAdmin={isAdmin}
                    onSave={(val) => onUpdateMonth('unit_goal_mrr', val)}
                 />
 
-                {/* Matrix Goal */}
+                {/* Matrix Goal - Uses ONLY closedThisMonth per user request */}
                 <VerticalGoal 
                    label="Meta Matriz"
-                   current={currentTotalRevenue}
+                   current={closedThisMonth}
                    target={matrixGoal}
                    color="#1A1A1A"
                    isAdmin={isAdmin}

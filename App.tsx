@@ -22,7 +22,7 @@ const App: React.FC = () => {
   // Supabase Data Hook
   const { 
     months, deals: allDeals, funnelStats: allFunnelStats, loading, error,
-    updateMonth, updateDeal, addDeal, updateFunnel, createFunnelStats, refresh
+    updateMonth, updateDeal, addDeal, deleteDeal, updateFunnel, createFunnelStats, refresh
   } = useSupabaseData(user?.email);
 
   // Set default month once data loads
@@ -70,6 +70,10 @@ const App: React.FC = () => {
   const handleUpdateDeal = (id: string, field: keyof Deal, value: any) => {
     updateDeal(id, field, value);
   };
+
+  const handleDeleteDeal = (id: string) => {
+    deleteDeal(id);
+  }
 
   const handleAddDeal = () => {
     // Determine Pipeline Type
@@ -315,6 +319,7 @@ const App: React.FC = () => {
                     isAdmin={user?.role === 'admin'}
                     onUpdateDeal={handleUpdateDeal}
                     onAddDeal={handleAddDeal}
+                    onDeleteDeal={handleDeleteDeal}
                  />
               </section>
               <section className="mt-8">
@@ -353,6 +358,7 @@ const App: React.FC = () => {
                     isAdmin={user?.role === 'admin'}
                     onUpdateDeal={handleUpdateDeal}
                     onAddDeal={handleAddDeal}
+                    onDeleteDeal={handleDeleteDeal}
                  />
               </section>
             </div>

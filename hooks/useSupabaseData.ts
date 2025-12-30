@@ -129,6 +129,21 @@ export const useSupabaseData = (userEmail?: string) => {
      }
   };
 
+  const deleteDeal = async (id: string) => {
+    // Optimistic Delete
+    setDeals(prev => prev.filter(d => d.id !== id));
+
+    if (!IS_DEMO_MODE) {
+      const { error } = await supabase.from('deals').delete().eq('id', id);
+      
+      if (error) {
+        console.error('Error deleting deal:', error);
+        alert("Erro ao excluir contrato.");
+        fetchData(); // Revert on error
+      }
+    }
+  };
+
   const updateFunnel = async (id: string, field: keyof FunnelStats, value: any) => {
     setFunnelStats(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
     
@@ -170,6 +185,7 @@ export const useSupabaseData = (userEmail?: string) => {
     updateMonth,
     updateDeal,
     addDeal,
+    deleteDeal,
     updateFunnel,
     createFunnelStats,
     refresh: fetchData
