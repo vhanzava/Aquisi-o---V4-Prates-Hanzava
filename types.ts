@@ -27,22 +27,22 @@ export interface MonthData {
   slug: string;
   working_days: number;
   
-  // Goals (Revenue)
-  unit_goal_mrr: number; // Corrected to match DB/Legacy
-  matrix_goal_mrr: number; // Corrected to match DB/Legacy
+  // Goals (Acquisition)
+  unit_goal_mrr: number; 
+  matrix_goal_mrr: number; 
   
-  // Base Revenue (Input Manual)
-  // "MRR Inicial + Monetização Base"
-  manual_base_revenue?: number; 
-
-  // Legacy/Other fields
+  // Goals (Monetization)
   unit_goal_monetization?: number;
   matrix_goal_monetization?: number;
+
+  // Base Revenue (Input Manual)
+  // "MRR Provisionado no Mês"
+  manual_base_revenue?: number; 
 
   // Lead Broker
   broker_planned_investment?: number;
   broker_realized_investment?: number;
-  broker_amount_spent?: number; // New field: Valor Gasto (Ads consumido)
+  broker_amount_spent?: number; // Valor Gasto (Ads consumido)
   broker_leads_bought?: number;
 
   // Deal Broker
@@ -53,7 +53,7 @@ export interface MonthData {
 export interface Deal {
   id: string; // UUID
   month_id: string;
-  pipeline_type: PipelineType; // New field to separate lists
+  pipeline_type: PipelineType; 
   client_name: string;
   status: DealStatus;
   type: DealType;

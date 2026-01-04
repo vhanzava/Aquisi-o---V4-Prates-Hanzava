@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MonthData, Deal, DealStatus } from '../types';
-import { DollarSign, TrendingUp, Target, Briefcase, Edit2, Coins, PieChart, History } from 'lucide-react';
+import { DollarSign, TrendingUp, Target, Briefcase, Edit2, Coins, PieChart, History, Wallet } from 'lucide-react';
 
 interface ExecutiveSummaryProps {
   variant: 'acquisition' | 'monetization';
@@ -220,7 +220,7 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
   const hexColor = isAcquisition ? '#E30613' : '#d97706';
   const borderColor = isAcquisition ? 'border-v4-red' : 'border-amber-600';
 
-  // 1. CALCULATIONS
+  // 1. CALCULATIONS (Actuals)
   const signedMRR = deals
     .filter(d => d.status === DealStatus.SIGNED)
     .reduce((sum, d) => sum + d.value_mrr, 0);
@@ -231,15 +231,32 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
 
   const closedThisMonth = signedMRR + signedFixed;
 
-  // REVISED LOGIC:
-  const previousMonthMRR = month.manual_base_revenue || 0;
-  const currentTotalRevenue = previousMonthMRR + closedThisMonth;
+  // 2. REVENUE CONTEXT
+  // "Provisionado" is the base revenue you start the month with (or expect to).
+  const provisionedMRR = month.manual_base_revenue || 0;
+  
+  // For Visualization: Total = Provisioned + New
+  const currentTotalRevenue = provisionedMRR + closedThisMonth;
 
-  // Goals - DATA SAFETY FALLBACK
-  // If the new 'unit_goal_mrr' is 0, we check if there's a legacy value (unit_goal_monetization or others we might map)
-  // This ensures no visual regression while DB migrates.
-  const unitGoal = month.unit_goal_mrr || month.unit_goal_monetization || 1;
-  const matrixGoal = month.matrix_goal_mrr || month.matrix_goal_monetization || 1;
+  // 3. GOAL LOGIC (SEPARATE STRUCTURES)
+  // We determine which fields to read/write based on the variant
+  let targetUnitGoal = 1;
+  let targetMatrixGoal = 1;
+  let fieldUnit: keyof MonthData = 'unit_goal_mrr';
+  let fieldMatrix: keyof MonthData = 'matrix_goal_mrr';
+
+  if (isAcquisition) {
+      targetUnitGoal = month.unit_goal_mrr || 0;
+      targetMatrixGoal = month.matrix_goal_mrr || 0;
+      fieldUnit = 'unit_goal_mrr';
+      fieldMatrix = 'matrix_goal_mrr';
+  } else {
+      // Monetization
+      targetUnitGoal = month.unit_goal_monetization || 0;
+      targetMatrixGoal = month.matrix_goal_monetization || 0;
+      fieldUnit = 'unit_goal_monetization';
+      fieldMatrix = 'matrix_goal_monetization';
+  }
 
   return (
     <div className="space-y-4 mb-8">
@@ -252,7 +269,7 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
       {/* ROW 1: STRATEGIC INDICATORS */}
       <div className={`${isAcquisition ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "flex justify-center"}`}>
         
-        {/* BLOCK 1: FATURAMENTO ATUAL (Custom Centered Layout) */}
+        {/* BLOCK 1: FATURAMENTO ATUAL (Custom Centered Layout - ACQUISITION ONLY) */}
         {isAcquisition && (
           <div className="h-full">
             <div className={`bg-white rounded-xl shadow-sm border ${borderColor} h-full p-6 relative overflow-hidden flex flex-col justify-center items-center text-center`}>
@@ -271,10 +288,10 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
               {/* Breakdown Grid */}
               <div className="flex items-center justify-center gap-8 w-full border-t border-gray-100 pt-4">
                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] text-gray-400 uppercase font-semibold">Base (Mês Anterior)</span>
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold">Provisionado</span>
                     <span className="text-lg font-bold text-gray-600 flex items-center gap-1">
-                       <History className="w-3 h-3 text-gray-400" />
-                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(previousMonthMRR)}
+                       <Wallet className="w-3 h-3 text-gray-400" />
+                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(provisionedMRR)}
                     </span>
                  </div>
                  <div className="h-8 w-px bg-gray-200"></div>
@@ -290,7 +307,7 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
           </div>
         )}
 
-        {/* BLOCK 2: GOALS (Dynamic Vertical Bars) */}
+        {/* BLOCK 2: GOALS (Dynamic Vertical Bars - SHARED LAYOUT, DIFFERENT DATA) */}
         <div className={isAcquisition ? "h-full" : "w-full md:w-1/2"}>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full min-h-[240px]">
              
@@ -298,29 +315,29 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
              <div className="flex justify-between items-center mb-4 border-b border-gray-50 pb-2">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
                   <Target className="w-4 h-4 text-gray-400" />
-                  Atingimento de Metas (Fechado Mês)
+                  Atingimento de Metas ({isAcquisition ? 'Aquisição' : 'Monetização'})
                 </p>
              </div>
              
              <div className="flex items-end justify-center h-full gap-8 md:gap-16 pb-2">
-                {/* Unit Goal - Uses ONLY closedThisMonth per user request */}
+                {/* Unit Goal */}
                 <VerticalGoal 
                    label="Meta Unidade"
                    current={closedThisMonth} 
-                   target={unitGoal}
+                   target={targetUnitGoal}
                    color={hexColor}
                    isAdmin={isAdmin}
-                   onSave={(val) => onUpdateMonth('unit_goal_mrr', val)}
+                   onSave={(val) => onUpdateMonth(fieldUnit, val)}
                 />
 
-                {/* Matrix Goal - Uses ONLY closedThisMonth per user request */}
+                {/* Matrix Goal */}
                 <VerticalGoal 
                    label="Meta Matriz"
                    current={closedThisMonth}
-                   target={matrixGoal}
+                   target={targetMatrixGoal}
                    color="#1A1A1A"
                    isAdmin={isAdmin}
-                   onSave={(val) => onUpdateMonth('matrix_goal_mrr', val)}
+                   onSave={(val) => onUpdateMonth(fieldMatrix, val)}
                 />
              </div>
           </div>
@@ -361,15 +378,16 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
           icon={<PieChart className="w-4 h-4 text-purple-400" />}
         />
 
-        {/* Card 4: MRR Mês Anterior (Manual Input - Replaces "Na Rua") */}
+        {/* Card 4: MRR Provisionado (Manual Input) */}
+        {/* We keep this visible in both, but it's the same shared field */}
         <EditableCard 
-          title="MRR Mês Anterior" 
-          value={previousMonthMRR} 
+          title="MRR Provisionado no mês" 
+          value={provisionedMRR} 
           isAdmin={isAdmin} 
           isEditable={true} 
           onSave={(val) => onUpdateMonth('manual_base_revenue', val)}
           variantColor="text-gray-600"
-          icon={<History className="w-4 h-4 text-gray-500" />}
+          icon={<Wallet className="w-4 h-4 text-gray-500" />}
           subtitle={<span className="text-[10px] text-gray-400">Base de Cálculo</span>}
         />
       </div>
