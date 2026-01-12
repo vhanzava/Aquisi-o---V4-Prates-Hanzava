@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Deal, DealStatus, FunnelType } from '../types';
-import { Calendar, Plus, ChevronDown, LayoutList, Kanban as KanbanIcon, X as XIcon, Trash2 } from 'lucide-react';
+import { Calendar, Plus, ChevronDown, LayoutList, Kanban as KanbanIcon, X as XIcon, Trash2, Clock } from 'lucide-react';
 import { DealKanbanBoard } from './DealKanbanBoard';
 
 interface DealTableProps {
@@ -21,6 +21,7 @@ const STATUS_OPTIONS = [
 ];
 
 const CHANNEL_OPTIONS = Object.values(FunnelType);
+const DURATION_OPTIONS = [6, 12, 18];
 
 const EditableCell = ({ 
   value, 
@@ -224,6 +225,9 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                     <th className="p-4 font-medium">{isAcquisition ? 'Escopo Fechado (R$)' : 'Escopo/Projeto (R$)'}</th>
                     <th className="p-4 font-medium">{isAcquisition ? 'Recorrente/MRR (R$)' : 'Assessoria/MRR (R$)'}</th>
                     
+                    {/* New Column: Duration (Acquisition Only) */}
+                    {isAcquisition && <th className="p-4 font-medium w-32">Duração (Meses)</th>}
+
                     <th className="p-4 font-medium">Data da Assinatura</th>
                     <th className="p-4 font-medium">Data de Início</th>
                     <th className="p-4 font-medium">Segmento</th>
@@ -278,6 +282,20 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                         />
                       </td>
 
+                       {/* Duration Cell (Acquisition Only) */}
+                       {isAcquisition && (
+                        <td className="p-4">
+                           <EditableCell 
+                            value={deal.contract_duration || 12} 
+                            type="select"
+                            options={DURATION_OPTIONS}
+                            isAdmin={isAdmin} 
+                            onSave={(val) => onUpdateDeal(deal.id, 'contract_duration', Number(val))}
+                            textClass="text-gray-600 font-medium"
+                          />
+                        </td>
+                      )}
+
                       <td className="p-4">
                         <EditableCell 
                           value={deal.sign_date || ''} 
@@ -319,7 +337,7 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   ))}
                   {deals.length === 0 && (
                     <tr>
-                      <td colSpan={isAdmin ? 9 : 8} className="p-8 text-center text-gray-400 italic">
+                      <td colSpan={isAdmin ? (isAcquisition ? 10 : 9) : (isAcquisition ? 9 : 8)} className="p-8 text-center text-gray-400 italic">
                         Nenhum contrato encontrado nesta categoria.
                       </td>
                     </tr>

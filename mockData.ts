@@ -57,6 +57,7 @@ export const MOCK_DEALS: Deal[] = [
     type: DealType.RECURRING,
     value_mrr: 2500,
     value_fixed: 8500,
+    contract_duration: 12,
     acquisition_channel: FunnelType.LEAD_BROKER,
     sign_date: '2025-10-14',
     start_date: '2025-10-15',
@@ -71,6 +72,7 @@ export const MOCK_DEALS: Deal[] = [
     type: DealType.MIXED,
     value_mrr: 6517,
     value_fixed: 11000,
+    contract_duration: 12,
     acquisition_channel: FunnelType.LEAD_BROKER,
     sign_date: '',
     start_date: '',
@@ -87,6 +89,7 @@ export const MOCK_DEALS: Deal[] = [
     type: DealType.FIXED,
     value_mrr: 0,
     value_fixed: 15000, // Upsell de Escopo
+    contract_duration: 6,
     acquisition_channel: FunnelType.INDICATION,
     sign_date: '2025-10-05',
     segment: 'Varejo'
@@ -99,7 +102,8 @@ export const MOCK_DEALS: Deal[] = [
     status: DealStatus.PENDING,
     type: DealType.RECURRING,
     value_mrr: 3000, // Upsell de Assessoria
-    value_fixed: 0, 
+    value_fixed: 0,
+    contract_duration: 12, 
     acquisition_channel: FunnelType.INDICATION,
     sign_date: '',
     segment: 'Serviços'

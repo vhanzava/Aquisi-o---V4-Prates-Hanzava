@@ -221,24 +221,31 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
   const borderColor = isAcquisition ? 'border-v4-red' : 'border-amber-600';
 
   // 1. CALCULATIONS (Actuals)
-  const signedMRR = deals
-    .filter(d => d.status === DealStatus.SIGNED)
-    .reduce((sum, d) => sum + d.value_mrr, 0);
-
-  const signedFixed = deals
-    .filter(d => d.status === DealStatus.SIGNED)
-    .reduce((sum, d) => sum + d.value_fixed, 0);
+  const signedDeals = deals.filter(d => d.status === DealStatus.SIGNED);
+  
+  const signedMRR = signedDeals.reduce((sum, d) => sum + d.value_mrr, 0);
+  const signedFixed = signedDeals.reduce((sum, d) => sum + d.value_fixed, 0);
 
   const closedThisMonth = signedMRR + signedFixed;
 
-  // 2. REVENUE CONTEXT
+  // 2. MATRIX GOAL LOGIC (CONDITIONAL)
+  // Acquisition: Escopo + (MRR * Duration)
+  // Monetization: Escopo + MRR (Standard)
+  const matrixAchievedValue = isAcquisition 
+      ? signedDeals.reduce((sum, d) => {
+          const duration = d.contract_duration || 12; // Default to 12 if missing
+          return sum + d.value_fixed + (d.value_mrr * duration);
+        }, 0)
+      : closedThisMonth;
+
+  // 3. REVENUE CONTEXT
   // "Provisionado" is the base revenue you start the month with (or expect to).
   const provisionedMRR = month.manual_base_revenue || 0;
   
   // For Visualization: Total = Provisioned + New
   const currentTotalRevenue = provisionedMRR + closedThisMonth;
 
-  // 3. GOAL LOGIC (SEPARATE STRUCTURES)
+  // 4. GOAL LOGIC (SEPARATE STRUCTURES)
   // We determine which fields to read/write based on the variant
   let targetUnitGoal = 1;
   let targetMatrixGoal = 1;
@@ -330,16 +337,21 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
                    onSave={(val) => onUpdateMonth(fieldUnit, val)}
                 />
 
-                {/* Matrix Goal */}
+                {/* Matrix Goal - Uses matrixAchievedValue (Duration logic applied here) */}
                 <VerticalGoal 
                    label="Meta Matriz"
-                   current={closedThisMonth}
+                   current={matrixAchievedValue} 
                    target={targetMatrixGoal}
                    color="#1A1A1A"
                    isAdmin={isAdmin}
                    onSave={(val) => onUpdateMonth(fieldMatrix, val)}
                 />
              </div>
+             {isAcquisition && (
+               <div className="text-center mt-2">
+                 <p className="text-[10px] text-gray-400">* Meta Matriz considera: Escopo + (MRR x Duração)</p>
+               </div>
+             )}
           </div>
         </div>
       </div>

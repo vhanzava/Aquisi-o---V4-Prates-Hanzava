@@ -62,6 +62,8 @@ export interface Deal {
   value_mrr: number;   // In Acquisition: MRR. In Monetization: Assessoria
   value_fixed: number; // In Acquisition: Escopo Fechado. In Monetization: Escopo Fechado
   
+  contract_duration?: number; // New field: 6, 12, or 18 months
+
   value_monetization?: number; // Deprecated/Legacy
   acquisition_channel: FunnelType;
   sign_date?: string;
