@@ -1,7 +1,8 @@
 
 export enum DealStatus {
   SIGNED = 'Signed',
-  PENDING = 'Pending_Na_Rua',
+  SENT = 'Na_Rua',     // Status Novo: Proposta na rua
+  PENDING = 'Pending', // Status Anterior: Em negociação/Qualificação
   LOST = 'Lost'
 }
 

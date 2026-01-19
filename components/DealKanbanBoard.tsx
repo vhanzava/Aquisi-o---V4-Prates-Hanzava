@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Deal, DealStatus, DealType } from '../types';
 import { RefreshCw, Briefcase, Calendar, DollarSign, GripVertical } from 'lucide-react';
@@ -66,8 +67,9 @@ const KanbanCard: React.FC<{ deal: Deal; isAdmin: boolean; variant: 'acquisition
 
 export const DealKanbanBoard: React.FC<DealKanbanBoardProps> = ({ deals, isAdmin, onUpdateDeal, variant }) => {
   const columns = [
-    { id: DealStatus.PENDING, title: 'Pendente / Na Rua', color: 'bg-yellow-50', border: 'border-yellow-200', iconColor: 'bg-yellow-400' },
-    { id: DealStatus.SIGNED, title: 'Assinado / Fechado', color: 'bg-green-50', border: 'border-green-200', iconColor: 'bg-green-500' },
+    { id: DealStatus.PENDING, title: 'Pendente', color: 'bg-yellow-50', border: 'border-yellow-200', iconColor: 'bg-yellow-400' },
+    { id: DealStatus.SENT, title: 'Na Rua', color: 'bg-blue-50', border: 'border-blue-200', iconColor: 'bg-blue-500' },
+    { id: DealStatus.SIGNED, title: 'Assinado', color: 'bg-green-50', border: 'border-green-200', iconColor: 'bg-green-500' },
     { id: DealStatus.LOST, title: 'Perdido', color: 'bg-gray-50', border: 'border-gray-200', iconColor: 'bg-gray-400' }
   ];
 
@@ -93,7 +95,7 @@ export const DealKanbanBoard: React.FC<DealKanbanBoardProps> = ({ deals, isAdmin
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-[500px]">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-full min-h-[500px]">
       {columns.map(col => {
         const colDeals = deals.filter(d => d.status === col.id);
         const total = calculateTotal(col.id);
@@ -108,7 +110,7 @@ export const DealKanbanBoard: React.FC<DealKanbanBoardProps> = ({ deals, isAdmin
             <div className="p-4 border-b border-gray-200/50 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${col.iconColor}`}></div>
-                <h3 className="font-bold text-gray-700 text-sm">{col.title}</h3>
+                <h3 className="font-bold text-gray-700 text-sm truncate">{col.title}</h3>
                 <span className="bg-white/50 text-gray-600 px-2 py-0.5 rounded-full text-xs font-bold">{colDeals.length}</span>
               </div>
             </div>

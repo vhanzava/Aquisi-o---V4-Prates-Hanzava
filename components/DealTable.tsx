@@ -16,6 +16,7 @@ interface DealTableProps {
 // Status Options
 const STATUS_OPTIONS = [
   { value: DealStatus.SIGNED, label: 'Assinado', color: 'bg-green-100 text-green-700' },
+  { value: DealStatus.SENT, label: 'Na Rua', color: 'bg-blue-100 text-blue-700' },
   { value: DealStatus.PENDING, label: 'Pendente', color: 'bg-yellow-100 text-yellow-700' },
   { value: DealStatus.LOST, label: 'Perdido', color: 'bg-gray-100 text-gray-600' }
 ];
@@ -147,7 +148,8 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
   };
 
   const signedStats = calculateStats(DealStatus.SIGNED);
-  const pendingStats = calculateStats(DealStatus.PENDING);
+  const sentStats = calculateStats(DealStatus.SENT); // Na Rua
+  const pendingStats = calculateStats(DealStatus.PENDING); // Pendente
   const lostStats = calculateStats(DealStatus.LOST);
 
   const handleDelete = (id: string, name: string) => {
@@ -371,11 +373,22 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   <div className="font-mono text-gray-600">{formatCurrency(signedStats.fixed)}</div>
               </div>
 
+              {/* Na Rua Row (NEW) */}
+              <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-gray-100 hover:bg-white transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span className="font-bold text-blue-700">Na Rua (Proposta)</span>
+                  </div>
+                  <div className="font-mono font-bold text-gray-800">{formatCurrency(sentStats.total)}</div>
+                  <div className="font-mono text-gray-600">{formatCurrency(sentStats.mrr)}</div>
+                  <div className="font-mono text-gray-600">{formatCurrency(sentStats.fixed)}</div>
+              </div>
+
               {/* Pending Row */}
               <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-gray-100 hover:bg-white transition-colors">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-                    <span className="font-bold text-yellow-700">Pendente / Na Rua</span>
+                    <span className="font-bold text-yellow-700">Pendente (Negociação)</span>
                   </div>
                   <div className="font-mono font-bold text-gray-800">{formatCurrency(pendingStats.total)}</div>
                   <div className="font-mono text-gray-600">{formatCurrency(pendingStats.mrr)}</div>

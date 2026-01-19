@@ -68,7 +68,7 @@ export const MOCK_DEALS: Deal[] = [
     month_id: getMonthId(2025, 10), // Oct 2025
     pipeline_type: 'acquisition',
     client_name: 'Mega Eletron (Acq)',
-    status: DealStatus.PENDING,
+    status: DealStatus.SENT, // Na Rua
     type: DealType.MIXED,
     value_mrr: 6517,
     value_fixed: 11000,
@@ -77,6 +77,21 @@ export const MOCK_DEALS: Deal[] = [
     sign_date: '',
     start_date: '',
     segment: 'Mobilidade'
+  },
+  {
+    id: 'd3',
+    month_id: getMonthId(2025, 10), // Oct 2025
+    pipeline_type: 'acquisition',
+    client_name: 'Tech Solutions',
+    status: DealStatus.PENDING, // Em negociação
+    type: DealType.RECURRING,
+    value_mrr: 4000,
+    value_fixed: 0,
+    contract_duration: 12,
+    acquisition_channel: FunnelType.OUTBOUND,
+    sign_date: '',
+    start_date: '',
+    segment: 'Tecnologia'
   },
   
   // --- MONETIZATION DEALS (Different Clients) ---
@@ -99,7 +114,7 @@ export const MOCK_DEALS: Deal[] = [
     month_id: getMonthId(2025, 10),
     pipeline_type: 'monetization',
     client_name: 'Cliente Base Antiga B',
-    status: DealStatus.PENDING,
+    status: DealStatus.SENT, // Na Rua
     type: DealType.RECURRING,
     value_mrr: 3000, // Upsell de Assessoria
     value_fixed: 0,
