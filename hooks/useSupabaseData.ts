@@ -147,10 +147,14 @@ export const useSupabaseData = (userEmail?: string) => {
             month_id: futureDeal.month_id
           };
 
-          await updateDealFull(futureDeal.id, updates);
+          // We update the future deal. 
+          // IMPORTANT: We do NOT pass 'skipPropagation=false' here, because we WANT the update to propagate further.
+          // However, calling updateDealFull will trigger propagateDealChange again for M+1 -> M+2.
+          // This creates a recursive chain. This is correct.
+          // But we must BREAK this loop here, because updateDealFull will handle the rest of the chain.
+          // If we don't break, we will iterate to M+2 in THIS loop, but updateDealFull will ALSO iterate to M+2.
           
-          // Since we updated this future deal, the loop continues to the next month 
-          // via the recursive call inside updateDealFull. So we break this loop to prevent double-processing.
+          await updateDealFull(futureDeal.id, updates);
           break; 
         } else {
           // Future deal does NOT exist.
@@ -163,9 +167,8 @@ export const useSupabaseData = (userEmail?: string) => {
             id: undefined // Let addDeal generate ID
           };
           
+          // addDeal will trigger propagation to M+2. So we break.
           await addDeal(newDealCopy, true); 
-          
-          // addDeal triggers propagation to M+2. So we break.
           break;
         }
       }
