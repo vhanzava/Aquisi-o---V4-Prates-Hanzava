@@ -89,7 +89,7 @@ export const useSupabaseData = (userEmail?: string) => {
     const currentIndex = sortedMonths.findIndex(m => m.id === currentMonthId);
     
     if (currentIndex === -1) {
-        console.warn(`[Propagation] Current month ${currentMonthId} not found in months list.`);
+        console.error(`[Propagation] Current month ${currentMonthId} not found in months list. List:`, months.map(m => m.id));
         return [];
     }
     return sortedMonths.slice(currentIndex + 1);
@@ -100,10 +100,12 @@ export const useSupabaseData = (userEmail?: string) => {
   };
 
   const propagateDealChange = async (updatedDeal: Deal, oldDeal: Deal) => {
-    console.log(`[Propagation] Starting for ${oldDeal.client_name} (${oldDeal.month_id})`);
-    console.log(`[Propagation] Change: ${oldDeal.status} -> ${updatedDeal.status}`);
+    console.warn(`[Propagation] STARTING for ${oldDeal.client_name} (${oldDeal.month_id})`);
+    console.warn(`[Propagation] Change: ${oldDeal.status} -> ${updatedDeal.status}`);
 
     const futureMonths = getFutureMonths(updatedDeal.month_id);
+    console.warn(`[Propagation] Future months found: ${futureMonths.length}`);
+
     const isNewStatusFinal = isFinalStatus(updatedDeal.status);
     
     // We use client_name + pipeline_type as the "key" to find the same deal in future months
@@ -112,6 +114,8 @@ export const useSupabaseData = (userEmail?: string) => {
     const searchPipeline = oldDeal.pipeline_type;
 
     for (const month of futureMonths) {
+      console.warn(`[Propagation] Checking month ${month.id}...`);
+      
       // Find the corresponding deal in this future month
       const futureDeal = deals.find(d => 
         d.month_id === month.id && 
@@ -123,7 +127,7 @@ export const useSupabaseData = (userEmail?: string) => {
         // Case 1: Deal became Final (Signed/Lost)
         // We must DELETE it from future months
         if (futureDeal) {
-          console.log(`[Propagation] Deleting future deal in ${month.id}`);
+          console.warn(`[Propagation] Deleting future deal in ${month.id}`);
           await deleteDeal(futureDeal.id, true); 
         }
         // If it became final, we stop propagating (it shouldn't exist beyond this point)
@@ -134,12 +138,12 @@ export const useSupabaseData = (userEmail?: string) => {
           // If future deal exists:
           // Check if it is already Final. If so, we STOP propagation (don't overwrite a Signed deal with Pending)
           if (isFinalStatus(futureDeal.status)) {
-            console.log(`[Propagation] Future deal in ${month.id} is already Final (${futureDeal.status}). Stopping.`);
+            console.warn(`[Propagation] Future deal in ${month.id} is already Final (${futureDeal.status}). Stopping.`);
             break; 
           }
 
           // If future deal is also Active, we update it to match the current deal
-          console.log(`[Propagation] Updating future deal in ${month.id}`);
+          console.warn(`[Propagation] Updating future deal in ${month.id}`);
           
           const updates: Partial<Deal> = {
             ...updatedDeal,
@@ -147,19 +151,15 @@ export const useSupabaseData = (userEmail?: string) => {
             month_id: futureDeal.month_id
           };
 
-          // We update the future deal. 
-          // IMPORTANT: We do NOT pass 'skipPropagation=false' here, because we WANT the update to propagate further.
-          // However, calling updateDealFull will trigger propagateDealChange again for M+1 -> M+2.
-          // This creates a recursive chain. This is correct.
-          // But we must BREAK this loop here, because updateDealFull will handle the rest of the chain.
-          // If we don't break, we will iterate to M+2 in THIS loop, but updateDealFull will ALSO iterate to M+2.
-          
           await updateDealFull(futureDeal.id, updates);
+          
+          // Since we updated this future deal, the loop continues to the next month 
+          // via the recursive call inside updateDealFull. So we break this loop to prevent double-processing.
           break; 
         } else {
           // Future deal does NOT exist.
           // We must CREATE it (Copy)
-          console.log(`[Propagation] Creating copy in ${month.id}`);
+          console.warn(`[Propagation] Creating copy in ${month.id}`);
           
           const newDealCopy: Partial<Deal> = {
             ...updatedDeal,
@@ -205,6 +205,7 @@ export const useSupabaseData = (userEmail?: string) => {
       const { error } = await supabase.from('deals').update(fieldsToUpdate).eq('id', id);
       if (error) {
         console.error("Failed to save Deal update:", error);
+        alert("Erro ao salvar atualização do contrato (Full Update)."); // Alert on error
         fetchData();
       }
     }
@@ -215,8 +216,12 @@ export const useSupabaseData = (userEmail?: string) => {
   };
 
   const updateDeal = async (id: string, field: keyof Deal, value: any) => {
+    console.warn(`[UpdateDeal] Called for ${id}, field: ${field}, value: ${value}`);
     const oldDeal = deals.find(d => d.id === id);
-    if (!oldDeal) return;
+    if (!oldDeal) {
+        console.error(`[UpdateDeal] Deal ${id} not found!`);
+        return;
+    }
 
     const updatedDeal = { ...oldDeal, [field]: value };
 
@@ -236,6 +241,7 @@ export const useSupabaseData = (userEmail?: string) => {
   };
 
   const addDeal = async (deal: Partial<Deal>, isPropagation = false) => {
+     console.warn(`[AddDeal] Called. IsPropagation: ${isPropagation}`);
      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
      const newDealOptimistic = { ...deal, id: tempId } as Deal;
      
@@ -250,7 +256,7 @@ export const useSupabaseData = (userEmail?: string) => {
        
        if (error) {
            console.error('Error persisting deal:', error);
-           if (!isPropagation) alert("Erro ao criar novo contrato.");
+           alert(`Erro ao criar novo contrato: ${error.message}`); // Always alert
            setDeals(prev => prev.filter(d => d.id !== tempId)); // Remove optimistic
            return;
        } else if (data) {
@@ -261,11 +267,10 @@ export const useSupabaseData = (userEmail?: string) => {
 
      // Trigger Propagation (only if Active)
      if (!isFinalStatus(finalDeal.status)) {
-        // For a new deal, oldDeal is effectively the same as newDeal (no changes to track)
-        // But we need to ensure it copies forward.
-        // propagateDealChange logic handles "if NOT found -> Create Copy".
-        // So we can call it.
+        console.warn(`[AddDeal] Triggering propagation for new deal ${finalDeal.id}`);
         await propagateDealChange(finalDeal, finalDeal);
+     } else {
+        console.warn(`[AddDeal] Skipping propagation (Final Status: ${finalDeal.status})`);
      }
   };
 
