@@ -84,9 +84,15 @@ export const useSupabaseData = (userEmail?: string) => {
   // --- PROPAGATION LOGIC ---
 
   const getFutureMonths = (currentMonthId: string) => {
-    const currentIndex = months.findIndex(m => m.id === currentMonthId);
-    if (currentIndex === -1) return [];
-    return months.slice(currentIndex + 1);
+    // Ensure months are sorted by ID to guarantee correct future order
+    const sortedMonths = [...months].sort((a, b) => a.id.localeCompare(b.id));
+    const currentIndex = sortedMonths.findIndex(m => m.id === currentMonthId);
+    
+    if (currentIndex === -1) {
+        console.warn(`[Propagation] Current month ${currentMonthId} not found in months list.`);
+        return [];
+    }
+    return sortedMonths.slice(currentIndex + 1);
   };
 
   const isFinalStatus = (status: DealStatus) => {
@@ -94,6 +100,9 @@ export const useSupabaseData = (userEmail?: string) => {
   };
 
   const propagateDealChange = async (updatedDeal: Deal, oldDeal: Deal) => {
+    console.log(`[Propagation] Starting for ${oldDeal.client_name} (${oldDeal.month_id})`);
+    console.log(`[Propagation] Change: ${oldDeal.status} -> ${updatedDeal.status}`);
+
     const futureMonths = getFutureMonths(updatedDeal.month_id);
     const isNewStatusFinal = isFinalStatus(updatedDeal.status);
     
@@ -114,11 +123,10 @@ export const useSupabaseData = (userEmail?: string) => {
         // Case 1: Deal became Final (Signed/Lost)
         // We must DELETE it from future months
         if (futureDeal) {
-          await deleteDeal(futureDeal.id, true); // true = skip propagation to avoid infinite loop? No, deletion should propagate.
+          console.log(`[Propagation] Deleting future deal in ${month.id}`);
+          await deleteDeal(futureDeal.id, true); 
         }
         // If it became final, we stop propagating (it shouldn't exist beyond this point)
-        // Actually, if we delete it in Month M+1, deleteDeal will handle M+2.
-        // So we can break here.
         break; 
       } else {
         // Case 2: Deal is Active (Pending/Sent)
@@ -126,48 +134,38 @@ export const useSupabaseData = (userEmail?: string) => {
           // If future deal exists:
           // Check if it is already Final. If so, we STOP propagation (don't overwrite a Signed deal with Pending)
           if (isFinalStatus(futureDeal.status)) {
+            console.log(`[Propagation] Future deal in ${month.id} is already Final (${futureDeal.status}). Stopping.`);
             break; 
           }
 
           // If future deal is also Active, we update it to match the current deal
-          // We update ALL fields except ID and MonthID
-          // We must update client_name to the NEW name if it changed
+          console.log(`[Propagation] Updating future deal in ${month.id}`);
           
-          // Construct updates
           const updates: Partial<Deal> = {
             ...updatedDeal,
             id: futureDeal.id,
             month_id: futureDeal.month_id
           };
 
-          // We need to call updateDeal for each field or create a bulk update?
-          // updateDeal takes (id, field, value). Calling it multiple times is inefficient and triggers re-renders.
-          // Let's create a internal helper for full update or just call updateDeal for key fields.
-          // For now, let's just update the deal object directly in state and DB.
-          
           await updateDealFull(futureDeal.id, updates);
           
           // Since we updated this future deal, the loop continues to the next month 
-          // (but updateDealFull might trigger its own propagation? We need to prevent infinite loops)
-          // If we pass a flag "skipPropagation" to updateDealFull, we can handle it manually here.
-          // But actually, if we update Month M+1, we WANT it to propagate to M+2.
-          // So we should let it propagate.
-          // BUT we must ensure we don't re-propagate to M+1.
-          // Since propagation moves forward (M -> M+1), calling update on M+1 will propagate to M+2.
-          // So we can just update M+1 and BREAK the loop, letting M+1's update handle M+2.
+          // via the recursive call inside updateDealFull. So we break this loop to prevent double-processing.
           break; 
         } else {
           // Future deal does NOT exist.
           // We must CREATE it (Copy)
+          console.log(`[Propagation] Creating copy in ${month.id}`);
+          
           const newDealCopy: Partial<Deal> = {
             ...updatedDeal,
             month_id: month.id,
             id: undefined // Let addDeal generate ID
           };
           
-          await addDeal(newDealCopy, true); // true = isPropagation
+          await addDeal(newDealCopy, true); 
           
-          // addDeal will trigger propagation to M+2. So we break.
+          // addDeal triggers propagation to M+2. So we break.
           break;
         }
       }
