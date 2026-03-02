@@ -81,6 +81,99 @@ export const useSupabaseData = (userEmail?: string) => {
     }
   }, [userEmail]);
 
+  // --- PROPAGATION LOGIC ---
+
+  const getFutureMonths = (currentMonthId: string) => {
+    const currentIndex = months.findIndex(m => m.id === currentMonthId);
+    if (currentIndex === -1) return [];
+    return months.slice(currentIndex + 1);
+  };
+
+  const isFinalStatus = (status: DealStatus) => {
+    return status === DealStatus.SIGNED || status === DealStatus.LOST;
+  };
+
+  const propagateDealChange = async (updatedDeal: Deal, oldDeal: Deal) => {
+    const futureMonths = getFutureMonths(updatedDeal.month_id);
+    const isNewStatusFinal = isFinalStatus(updatedDeal.status);
+    
+    // We use client_name + pipeline_type as the "key" to find the same deal in future months
+    // If client_name changed, we use the OLD name to find the future deals
+    const searchName = oldDeal.client_name;
+    const searchPipeline = oldDeal.pipeline_type;
+
+    for (const month of futureMonths) {
+      // Find the corresponding deal in this future month
+      const futureDeal = deals.find(d => 
+        d.month_id === month.id && 
+        d.client_name === searchName && 
+        d.pipeline_type === searchPipeline
+      );
+
+      if (isNewStatusFinal) {
+        // Case 1: Deal became Final (Signed/Lost)
+        // We must DELETE it from future months
+        if (futureDeal) {
+          await deleteDeal(futureDeal.id, true); // true = skip propagation to avoid infinite loop? No, deletion should propagate.
+        }
+        // If it became final, we stop propagating (it shouldn't exist beyond this point)
+        // Actually, if we delete it in Month M+1, deleteDeal will handle M+2.
+        // So we can break here.
+        break; 
+      } else {
+        // Case 2: Deal is Active (Pending/Sent)
+        if (futureDeal) {
+          // If future deal exists:
+          // Check if it is already Final. If so, we STOP propagation (don't overwrite a Signed deal with Pending)
+          if (isFinalStatus(futureDeal.status)) {
+            break; 
+          }
+
+          // If future deal is also Active, we update it to match the current deal
+          // We update ALL fields except ID and MonthID
+          // We must update client_name to the NEW name if it changed
+          
+          // Construct updates
+          const updates: Partial<Deal> = {
+            ...updatedDeal,
+            id: futureDeal.id,
+            month_id: futureDeal.month_id
+          };
+
+          // We need to call updateDeal for each field or create a bulk update?
+          // updateDeal takes (id, field, value). Calling it multiple times is inefficient and triggers re-renders.
+          // Let's create a internal helper for full update or just call updateDeal for key fields.
+          // For now, let's just update the deal object directly in state and DB.
+          
+          await updateDealFull(futureDeal.id, updates);
+          
+          // Since we updated this future deal, the loop continues to the next month 
+          // (but updateDealFull might trigger its own propagation? We need to prevent infinite loops)
+          // If we pass a flag "skipPropagation" to updateDealFull, we can handle it manually here.
+          // But actually, if we update Month M+1, we WANT it to propagate to M+2.
+          // So we should let it propagate.
+          // BUT we must ensure we don't re-propagate to M+1.
+          // Since propagation moves forward (M -> M+1), calling update on M+1 will propagate to M+2.
+          // So we can just update M+1 and BREAK the loop, letting M+1's update handle M+2.
+          break; 
+        } else {
+          // Future deal does NOT exist.
+          // We must CREATE it (Copy)
+          const newDealCopy: Partial<Deal> = {
+            ...updatedDeal,
+            month_id: month.id,
+            id: undefined // Let addDeal generate ID
+          };
+          
+          await addDeal(newDealCopy, true); // true = isPropagation
+          
+          // addDeal will trigger propagation to M+2. So we break.
+          break;
+        }
+      }
+    }
+  };
+
   // --- CRUD OPERATIONS ---
 
   const updateMonth = async (id: string, field: keyof MonthData, value: any) => {
@@ -97,8 +190,36 @@ export const useSupabaseData = (userEmail?: string) => {
     }
   };
 
+  // Helper for full update (internal use)
+  const updateDealFull = async (id: string, updates: Partial<Deal>, skipPropagation = false) => {
+    const oldDeal = deals.find(d => d.id === id);
+    if (!oldDeal) return;
+
+    const updatedDeal = { ...oldDeal, ...updates };
+
+    setDeals(prev => prev.map(d => d.id === id ? updatedDeal : d));
+
+    if (!IS_DEMO_MODE) {
+      const { id: _, ...fieldsToUpdate } = updates; // Exclude ID
+      const { error } = await supabase.from('deals').update(fieldsToUpdate).eq('id', id);
+      if (error) {
+        console.error("Failed to save Deal update:", error);
+        fetchData();
+      }
+    }
+
+    if (!skipPropagation) {
+      await propagateDealChange(updatedDeal, oldDeal);
+    }
+  };
+
   const updateDeal = async (id: string, field: keyof Deal, value: any) => {
-    setDeals(prev => prev.map(d => d.id === id ? { ...d, [field]: value } : d));
+    const oldDeal = deals.find(d => d.id === id);
+    if (!oldDeal) return;
+
+    const updatedDeal = { ...oldDeal, [field]: value };
+
+    setDeals(prev => prev.map(d => d.id === id ? updatedDeal : d));
     
     if (!IS_DEMO_MODE) {
       const { error } = await supabase.from('deals').update({ [field]: value }).eq('id', id);
@@ -108,12 +229,19 @@ export const useSupabaseData = (userEmail?: string) => {
         fetchData();
       }
     }
+
+    // Trigger Propagation
+    await propagateDealChange(updatedDeal, oldDeal);
   };
 
-  const addDeal = async (deal: Partial<Deal>) => {
-     const tempId = `temp_${Date.now()}`;
+  const addDeal = async (deal: Partial<Deal>, isPropagation = false) => {
+     const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
      const newDealOptimistic = { ...deal, id: tempId } as Deal;
+     
+     // Update State
      setDeals(prev => [...prev, newDealOptimistic]);
+
+     let finalDeal = newDealOptimistic;
 
      if (!IS_DEMO_MODE) {
        const { id, ...dealData } = deal as any;
@@ -121,15 +249,28 @@ export const useSupabaseData = (userEmail?: string) => {
        
        if (error) {
            console.error('Error persisting deal:', error);
-           alert("Erro ao criar novo contrato.");
+           if (!isPropagation) alert("Erro ao criar novo contrato.");
            setDeals(prev => prev.filter(d => d.id !== tempId)); // Remove optimistic
+           return;
        } else if (data) {
+           finalDeal = data[0];
            setDeals(prev => prev.map(d => d.id === tempId ? data[0] : d));
        }
      }
+
+     // Trigger Propagation (only if Active)
+     if (!isFinalStatus(finalDeal.status)) {
+        // For a new deal, oldDeal is effectively the same as newDeal (no changes to track)
+        // But we need to ensure it copies forward.
+        // propagateDealChange logic handles "if NOT found -> Create Copy".
+        // So we can call it.
+        await propagateDealChange(finalDeal, finalDeal);
+     }
   };
 
-  const deleteDeal = async (id: string) => {
+  const deleteDeal = async (id: string, isPropagation = false) => {
+    const dealToDelete = deals.find(d => d.id === id);
+    
     // Optimistic Delete
     setDeals(prev => prev.filter(d => d.id !== id));
 
@@ -138,9 +279,37 @@ export const useSupabaseData = (userEmail?: string) => {
       
       if (error) {
         console.error('Error deleting deal:', error);
-        alert("Erro ao excluir contrato.");
+        if (!isPropagation) alert("Erro ao excluir contrato.");
         fetchData(); // Revert on error
+        return;
       }
+    }
+
+    // Propagate Deletion
+    // If we delete a deal, we should delete its future copies?
+    // User: "Quando um cliente for marcado como Assinado ou Perdido, o contrato para de aparecer para os meses para frente"
+    // This implies deletion.
+    // Also if I manually delete a deal in Jan, it should probably disappear from Feb?
+    // Yes, usually.
+    if (dealToDelete) {
+        const futureMonths = getFutureMonths(dealToDelete.month_id);
+        for (const month of futureMonths) {
+            const futureDeal = deals.find(d => 
+                d.month_id === month.id && 
+                d.client_name === dealToDelete.client_name && 
+                d.pipeline_type === dealToDelete.pipeline_type
+            );
+            
+            if (futureDeal) {
+                // If future deal is Final, do we delete it?
+                // If I delete the "Origin" deal, the "Result" deal might be orphan.
+                // But if I delete Jan, maybe I just want to remove Jan entry.
+                // However, given the "thread" logic, deleting the root usually deletes the chain.
+                // Let's assume yes.
+                await deleteDeal(futureDeal.id, true);
+                break; // deleteDeal(futureDeal) will recurse
+            }
+        }
     }
   };
 
