@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase, IS_DEMO_MODE } from '../supabaseClient';
-import { MonthData, Deal, FunnelStats } from '../types';
+import { MonthData, Deal, FunnelStats, DealStatus } from '../types';
 import { MOCK_MONTHS } from '../mockData';
 
 export const useSupabaseData = (userEmail?: string) => {
