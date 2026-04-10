@@ -196,12 +196,11 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
   const signedFixed = signedDeals.reduce((sum, d) => sum + d.value_fixed, 0);
   const closedThisMonth = signedMRR + signedFixed;
 
-  const matrixAchievedValue = isAcquisition
-    ? signedDeals.reduce((sum, d) => {
-        const duration = d.contract_duration || 12;
-        return sum + d.value_fixed + (d.value_mrr * duration);
-      }, 0)
-    : closedThisMonth;
+  // Meta Matriz: usa Escopo + (MRR × Duração) para Aquisição e Monetização
+  const matrixAchievedValue = signedDeals.reduce((sum, d) => {
+    const duration = d.contract_duration || 12;
+    return sum + d.value_fixed + (d.value_mrr * duration);
+  }, 0);
 
   const provisionedMRR = month.manual_base_revenue || 0;
   const currentTotalRevenue = provisionedMRR + closedThisMonth;
@@ -223,7 +222,6 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
     fieldMatrix = 'matrix_goal_monetization';
   }
 
-  // ─── Cenários & Status ───────────────────────────────────────────
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
 
@@ -253,11 +251,9 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
     if (pct === 1.10) return progressPct >= 110;
     return false;
   };
-  // ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4 mb-8">
-      {/* Título */}
       <h2 className={`text-xl font-bold flex items-center gap-2 ${themeColor}`}>
         {isAcquisition ? <Briefcase className="w-6 h-6" /> : <Coins className="w-6 h-6" />}
         {isAcquisition ? 'Resumo de Aquisição' : 'Resumo de Monetização'}
@@ -322,11 +318,9 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
                 onSave={(val) => onUpdateMonth(fieldMatrix, val)}
               />
             </div>
-            {isAcquisition && (
-              <div className="text-center mt-2">
-                <p className="text-[10px] text-gray-400">* Meta Matriz considera: Escopo + (MRR x Duração)</p>
-              </div>
-            )}
+            <div className="text-center mt-2">
+              <p className="text-[10px] text-gray-400">* Meta Matriz considera: Escopo + (MRR x Duração)</p>
+            </div>
           </div>
         </div>
       </div>
@@ -378,7 +372,6 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
             {currentScenario.emoji} {currentScenario.label}
           </span>
         </div>
-
         <div className="mb-3">
           <div className="flex justify-between text-xs text-gray-500 mb-1.5">
             <span>Progresso da Meta Total</span>
@@ -391,7 +384,6 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
             />
           </div>
         </div>
-
         <div className="flex justify-between text-sm text-gray-500">
           <span>Meta Unidade: <span className="font-semibold text-gray-800">{formatCurrency(targetUnitGoal)}</span></span>
           <span>Faltam: <span className="font-semibold text-gray-800">{formatCurrency(Math.max(0, targetUnitGoal - closedThisMonth))}</span></span>
@@ -406,7 +398,6 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
           </h3>
           <p className="text-xs text-gray-400 mt-0.5">Projeções baseadas no atingimento percentual da meta total</p>
         </div>
-
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {scenarios.map((scenario) => {
             const active = isActiveScenario(scenario.pct);
