@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Deal, DealStatus, FunnelType } from '../types';
 import { Calendar, Plus, ChevronDown, LayoutList, Kanban as KanbanIcon, X as XIcon, Trash2, Clock } from 'lucide-react';
@@ -137,19 +136,17 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
 
-  // Summary Calculations
   const calculateStats = (status: DealStatus) => {
     const filtered = deals.filter(d => d.status === status);
     const mrr = filtered.reduce((acc, d) => acc + d.value_mrr, 0);
     const fixed = filtered.reduce((acc, d) => acc + d.value_fixed, 0);
     const total = mrr + fixed;
-    
     return { total, mrr, fixed };
   };
 
   const signedStats = calculateStats(DealStatus.SIGNED);
-  const sentStats = calculateStats(DealStatus.SENT); // Na Rua
-  const pendingStats = calculateStats(DealStatus.PENDING); // Pendente
+  const sentStats = calculateStats(DealStatus.SENT);
+  const pendingStats = calculateStats(DealStatus.PENDING);
   const lostStats = calculateStats(DealStatus.LOST);
 
   const handleDelete = (id: string, name: string) => {
@@ -162,15 +159,12 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         
-        {/* Header with View Toggle */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-white relative">
           <div className={`absolute top-0 left-0 w-full h-1 ${headerBg}`}></div>
           <div className="flex items-center gap-4">
              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <span className={`text-${themeColor}`}>👥</span> Gestão de Contratos ({isAcquisition ? 'Aquisição' : 'Monetização'})
              </h2>
-             
-             {/* View Toggle */}
              <div className="bg-gray-100 p-1 rounded-lg flex items-center">
                 <button 
                   onClick={() => setViewMode('table')}
@@ -203,7 +197,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
           )}
         </div>
 
-        {/* Content Area */}
         {viewMode === 'kanban' ? (
           <div className="p-6 bg-gray-50/50">
              <DealKanbanBoard 
@@ -222,14 +215,9 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                     <th className="p-4 font-medium w-32">Status</th>
                     <th className="p-4 font-medium">Nome do Cliente</th>
                     <th className="p-4 font-medium w-40">Canal</th>
-                    
-                    {/* Unified Columns for both variants */}
                     <th className="p-4 font-medium">{isAcquisition ? 'Escopo Fechado (R$)' : 'Escopo/Projeto (R$)'}</th>
                     <th className="p-4 font-medium">{isAcquisition ? 'Recorrente/MRR (R$)' : 'Assessoria/MRR (R$)'}</th>
-                    
-                    {/* New Column: Duration (Acquisition Only) */}
-                    {isAcquisition && <th className="p-4 font-medium w-32">Duração (Meses)</th>}
-
+                    <th className="p-4 font-medium w-32">Duração (Meses)</th>
                     <th className="p-4 font-medium">Data da Assinatura</th>
                     <th className="p-4 font-medium">Data de Início</th>
                     <th className="p-4 font-medium">Segmento</th>
@@ -255,7 +243,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                           onSave={(val) => onUpdateDeal(deal.id, 'client_name', val)} 
                         />
                       </td>
-                      
                       <td className="p-4 text-gray-500">
                         <EditableCell 
                           value={deal.acquisition_channel} 
@@ -265,7 +252,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                           onSave={(val) => onUpdateDeal(deal.id, 'acquisition_channel', val)} 
                         />
                       </td>
-
                       <td className="p-4 font-mono">
                         <EditableCell 
                           value={deal.value_fixed} 
@@ -274,7 +260,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                           onSave={(val) => onUpdateDeal(deal.id, 'value_fixed', val)} 
                         />
                       </td>
-                      
                       <td className="p-4 font-mono font-semibold">
                         <EditableCell 
                           value={deal.value_mrr} 
@@ -284,19 +269,17 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                         />
                       </td>
 
-                       {/* Duration Cell (Acquisition Only) */}
-                       {isAcquisition && (
-                        <td className="p-4">
-                           <EditableCell 
-                            value={deal.contract_duration || 12} 
-                            type="select"
-                            options={DURATION_OPTIONS}
-                            isAdmin={isAdmin} 
-                            onSave={(val) => onUpdateDeal(deal.id, 'contract_duration', Number(val))}
-                            textClass="text-gray-600 font-medium"
-                          />
-                        </td>
-                      )}
+                      {/* Duration Cell (Aquisição e Monetização) */}
+                      <td className="p-4">
+                        <EditableCell 
+                          value={deal.contract_duration || 12} 
+                          type="select"
+                          options={DURATION_OPTIONS}
+                          isAdmin={isAdmin} 
+                          onSave={(val) => onUpdateDeal(deal.id, 'contract_duration', Number(val))}
+                          textClass="text-gray-600 font-medium"
+                        />
+                      </td>
 
                       <td className="p-4">
                         <EditableCell 
@@ -306,7 +289,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                           onSave={(val) => onUpdateDeal(deal.id, 'sign_date', val)} 
                         />
                       </td>
-                      
                       <td className="p-4">
                         <EditableCell 
                           value={deal.start_date || ''} 
@@ -315,7 +297,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                           onSave={(val) => onUpdateDeal(deal.id, 'start_date', val)} 
                         />
                       </td>
-
                       <td className="p-4">
                         <EditableCell 
                           value={deal.segment || ''} 
@@ -323,7 +304,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                           onSave={(val) => onUpdateDeal(deal.id, 'segment', val)} 
                         />
                       </td>
-                      
                       {isAdmin && (
                         <td className="p-4 text-center">
                           <button 
@@ -339,7 +319,7 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   ))}
                   {deals.length === 0 && (
                     <tr>
-                      <td colSpan={isAdmin ? (isAcquisition ? 10 : 9) : (isAcquisition ? 9 : 8)} className="p-8 text-center text-gray-400 italic">
+                      <td colSpan={isAdmin ? 10 : 9} className="p-8 text-center text-gray-400 italic">
                         Nenhum contrato encontrado nesta categoria.
                       </td>
                     </tr>
@@ -348,21 +328,16 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
               </table>
             </div>
 
-            {/* New Summary Footer */}
             <div className="bg-gray-50 border-t border-gray-200">
               <div className="p-4 border-b border-gray-200 bg-gray-100 font-bold text-gray-700 text-sm uppercase tracking-wide">
                   Resumo do Mês
               </div>
-              
-              {/* Header Row for Summary */}
               <div className="grid grid-cols-4 gap-4 px-6 py-2 text-xs font-semibold text-gray-500 uppercase">
                   <div>Categoria</div>
                   <div>Valor Total</div>
                   <div>{isAcquisition ? 'Recorrente (MRR)' : 'Assessoria (MRR)'}</div>
                   <div>{isAcquisition ? 'Escopo Fechado' : 'Escopo/Projeto'}</div>
               </div>
-
-              {/* Signed Row */}
               <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-gray-100 hover:bg-white transition-colors">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -372,8 +347,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   <div className="font-mono text-gray-600">{formatCurrency(signedStats.mrr)}</div>
                   <div className="font-mono text-gray-600">{formatCurrency(signedStats.fixed)}</div>
               </div>
-
-              {/* Na Rua Row (NEW) */}
               <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-gray-100 hover:bg-white transition-colors">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -383,8 +356,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   <div className="font-mono text-gray-600">{formatCurrency(sentStats.mrr)}</div>
                   <div className="font-mono text-gray-600">{formatCurrency(sentStats.fixed)}</div>
               </div>
-
-              {/* Pending Row */}
               <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-gray-100 hover:bg-white transition-colors">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
@@ -394,9 +365,7 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   <div className="font-mono text-gray-600">{formatCurrency(pendingStats.mrr)}</div>
                   <div className="font-mono text-gray-600">{formatCurrency(pendingStats.fixed)}</div>
               </div>
-
-                {/* Lost Row */}
-                <div className="grid grid-cols-4 gap-4 px-6 py-3 hover:bg-white transition-colors">
+              <div className="grid grid-cols-4 gap-4 px-6 py-3 hover:bg-white transition-colors">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-gray-400"></div>
                     <span className="font-bold text-gray-500">Perdido</span>
@@ -405,7 +374,6 @@ export const DealTable: React.FC<DealTableProps> = ({ deals, isAdmin, onUpdateDe
                   <div className="font-mono text-gray-400">{formatCurrency(lostStats.mrr)}</div>
                   <div className="font-mono text-gray-400">{formatCurrency(lostStats.fixed)}</div>
               </div>
-
             </div>
           </>
         )}
