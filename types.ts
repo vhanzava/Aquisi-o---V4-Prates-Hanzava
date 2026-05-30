@@ -1,4 +1,3 @@
-
 export enum DealStatus {
   SIGNED = 'Signed',
   SENT = 'Na_Rua',     // Status Novo: Proposta na rua
@@ -21,24 +20,26 @@ export enum FunnelType {
 
 export type PipelineType = 'acquisition' | 'monetization';
 
+export type PaymentMethod = 'cash' | 'credit_card';
+
 export interface MonthData {
   id: string; // '2025-10'
   name: string;
   year: number;
   slug: string;
   working_days: number;
-  
+
   // Goals (Acquisition)
-  unit_goal_mrr: number; 
-  matrix_goal_mrr: number; 
-  
+  unit_goal_mrr: number;
+  matrix_goal_mrr: number;
+
   // Goals (Monetization)
   unit_goal_monetization?: number;
   matrix_goal_monetization?: number;
 
   // Base Revenue (Input Manual)
   // "MRR Provisionado no Mês"
-  manual_base_revenue?: number; 
+  manual_base_revenue?: number;
 
   // Lead Broker
   broker_planned_investment?: number;
@@ -54,15 +55,15 @@ export interface MonthData {
 export interface Deal {
   id: string; // UUID
   month_id: string;
-  pipeline_type: PipelineType; 
+  pipeline_type: PipelineType;
   client_name: string;
   status: DealStatus;
   type: DealType;
-  
+
   // Unified Values for both Pipelines
   value_mrr: number;   // In Acquisition: MRR. In Monetization: Assessoria
   value_fixed: number; // In Acquisition: Escopo Fechado. In Monetization: Escopo Fechado
-  
+
   contract_duration?: number; // New field: 6, 12, or 18 months
 
   value_monetization?: number; // Deprecated/Legacy
@@ -70,13 +71,22 @@ export interface Deal {
   sign_date?: string;
   start_date?: string;
   segment?: string;
+
+  // Temperatura da negociação: 1 (frio) → 5 (quente)
+  temperature?: 1 | 2 | 3 | 4 | 5;
+
+  // Forma de Pagamento
+  payment_method?: PaymentMethod;
+
+  // Royalties (20% já incluso)
+  has_royalties?: boolean;
 }
 
 export interface FunnelStats {
   id: string; // UUID
   month_id: string;
   funnel_type: FunnelType;
-  
+
   // Productivity
   leads: number;
   leads_worked: number;
@@ -88,7 +98,7 @@ export interface FunnelStats {
   meetings_scheduled: number;
   meetings_realized: number;
   sales: number;
-  invested_amount: number; 
+  invested_amount: number;
 }
 
 export interface UserProfile {
