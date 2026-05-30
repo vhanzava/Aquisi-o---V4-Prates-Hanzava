@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MonthData, Deal, DealStatus } from '../types';
-import { DollarSign, TrendingUp, Target, Briefcase, Edit2, Coins, PieChart, History, Wallet } from 'lucide-react';
+import { MonthData, Deal, DealStatus, calculateDealCash } from '../types';
+import { DollarSign, TrendingUp, Target, Briefcase, Edit2, Coins, PieChart, Wallet, Banknote } from 'lucide-react';
 
 interface ExecutiveSummaryProps {
   variant: 'acquisition' | 'monetization';
@@ -196,6 +196,9 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
   const signedFixed = signedDeals.reduce((sum, d) => sum + d.value_fixed, 0);
   const closedThisMonth = signedMRR + signedFixed;
 
+  // Caixa real: soma dos deals assinados já descontando royalties (20%) e antecipação (17% se aplicável)
+  const signedCashNet = signedDeals.reduce((sum, d) => sum + calculateDealCash(d).net, 0);
+
   // Meta Matriz: usa Escopo + (MRR × Duração) para Aquisição e Monetização
   const matrixAchievedValue = signedDeals.reduce((sum, d) => {
     const duration = d.contract_duration || 12;
@@ -325,8 +328,8 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
         </div>
       </div>
 
-      {/* ROW 2: 4 Cards de breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* ROW 2: Cards de breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <EditableCard
           title="Fechado no Mês"
           value={closedThisMonth}
@@ -361,6 +364,16 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
           variantColor="text-gray-600"
           icon={<Wallet className="w-4 h-4 text-gray-500" />}
           subtitle={<span className="text-[10px] text-gray-400">Base de Cálculo</span>}
+        />
+        <EditableCard
+          title="💰 Caixa Real (Assinados)"
+          value={signedCashNet}
+          isAdmin={isAdmin}
+          isEditable={false}
+          variantColor="text-emerald-700"
+          highlight={true}
+          icon={<Banknote className="w-4 h-4 text-emerald-600" />}
+          subtitle={<span className="text-[10px] text-emerald-600 font-medium">Após royalties 20% + antecipação</span>}
         />
       </div>
 
