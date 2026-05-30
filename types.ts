@@ -1,7 +1,7 @@
 export enum DealStatus {
   SIGNED = 'Signed',
-  SENT = 'Na_Rua',     // Status Novo: Proposta na rua
-  PENDING = 'Pending', // Status Anterior: Em negociação/Qualificação
+  SENT = 'Na_Rua',
+  PENDING = 'Pending',
   LOST = 'Lost'
 }
 
@@ -20,53 +20,66 @@ export enum FunnelType {
 
 export type PipelineType = 'acquisition' | 'monetization';
 
-export type PaymentMethod = 'cash' | 'credit_card';
+export type PaymentMethod = 'pix' | 'credit_card';
+
+export const ROYALTIES_RATE = 0.20;
+export const ANTICIPATION_RATE = 0.17;
+
+export interface CashBreakdown {
+  gross: number;         // valor total bruto do contrato (MRR × duração + escopo)
+  royalties: number;     // 20% sempre
+  anticipationFee: number; // 17% se cartão + antecipar
+  net: number;           // o que entra no caixa de fato
+}
+
+export function calculateDealCash(deal: Deal): CashBreakdown {
+  const duration = deal.contract_duration || 12;
+  const gross = (deal.value_mrr * duration) + deal.value_fixed;
+  const royalties = gross * ROYALTIES_RATE;
+  const anticipationFee = (deal.payment_method === 'credit_card' && deal.anticipate) ? gross * ANTICIPATION_RATE : 0;
+  const net = gross - royalties - anticipationFee;
+  return { gross, royalties, anticipationFee, net };
+}
 
 export interface MonthData {
-  id: string; // '2025-10'
+  id: string;
   name: string;
   year: number;
   slug: string;
   working_days: number;
 
-  // Goals (Acquisition)
   unit_goal_mrr: number;
   matrix_goal_mrr: number;
 
-  // Goals (Monetization)
   unit_goal_monetization?: number;
   matrix_goal_monetization?: number;
 
-  // Base Revenue (Input Manual)
-  // "MRR Provisionado no Mês"
   manual_base_revenue?: number;
 
-  // Lead Broker
   broker_planned_investment?: number;
   broker_realized_investment?: number;
-  broker_amount_spent?: number; // Valor Gasto (Ads consumido)
+  broker_amount_spent?: number;
   broker_leads_bought?: number;
 
-  // Deal Broker
   deal_broker_investment?: number;
   deal_broker_deals_bought?: number;
 }
 
 export interface Deal {
-  id: string; // UUID
+  id: string;
   month_id: string;
   pipeline_type: PipelineType;
   client_name: string;
   status: DealStatus;
   type: DealType;
 
-  // Unified Values for both Pipelines
-  value_mrr: number;   // In Acquisition: MRR. In Monetization: Assessoria
-  value_fixed: number; // In Acquisition: Escopo Fechado. In Monetization: Escopo Fechado
+  value_mrr: number;
+  value_fixed: number;
 
-  contract_duration?: number; // New field: 6, 12, or 18 months
+  contract_duration?: number;
 
-  value_monetization?: number; // Deprecated/Legacy
+  value_monetization?: number; // deprecated
+  has_royalties?: boolean;     // deprecated — royalties always 20%
   acquisition_channel: FunnelType;
   sign_date?: string;
   start_date?: string;
@@ -78,22 +91,20 @@ export interface Deal {
   // Forma de Pagamento
   payment_method?: PaymentMethod;
 
-  // Royalties (20% já incluso)
-  has_royalties?: boolean;
+  // Antecipar recebimento? (apenas cartão de crédito)
+  anticipate?: boolean;
 }
 
 export interface FunnelStats {
-  id: string; // UUID
+  id: string;
   month_id: string;
   funnel_type: FunnelType;
 
-  // Productivity
   leads: number;
   leads_worked: number;
   calls: number;
   call_duration_minutes: number;
 
-  // Funnel
   connections: number;
   meetings_scheduled: number;
   meetings_realized: number;
