@@ -273,7 +273,7 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
               </h1>
               <div className="flex items-center justify-center gap-8 w-full border-t border-gray-100 pt-4">
                 <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-gray-400 uppercase font-semibold">Provisionado</span>
+                  <span className="text-[10px] text-gray-400 uppercase font-semibold">Receitas Mês Ant.</span>
                   <span className="text-lg font-bold text-gray-600 flex items-center gap-1">
                     <Wallet className="w-3 h-3 text-gray-400" />
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(provisionedMRR)}
@@ -353,7 +353,7 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ variant, mon
           icon={<PieChart className="w-4 h-4 text-purple-400" />}
         />
         <EditableCard
-          title="MRR Provisionado no mês"
+          title="Receitas Mês Anterior"
           value={provisionedMRR}
           isAdmin={isAdmin}
           isEditable={true}
